@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -6,8 +6,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -132,11 +130,6 @@ const exposureData = [
   { name: "Credit", value: 5, color: "#7c3aed" }
 ];
 
-const readinessData = meetings.map((meeting) => ({
-  name: meeting.time,
-  readiness: meeting.prep
-}));
-
 const productivityData = [
   { week: "W1", saved: 6.5 },
   { week: "W2", saved: 8.2 },
@@ -154,6 +147,22 @@ const cashFlowData = [
 const sampleNotes =
   "Sterling quarterly review finished at 10:52 AM. Robert and Anne want to reduce overall portfolio risk after the sale of Anne's dental practice. Robert asked whether we can move roughly $250,000 from the family trust to their operating account by May 3 for the Stanford housing deposit and planned renovation invoice. They also want a short written summary of the tax-loss harvesting opportunity in the municipal bond sleeve. Confirmed that their daughter Maya accepted Stanford and starts in September. Update CRM risk tolerance from Moderate to Conservative and ask Daniel to prepare transfer paperwork.";
 
+const defaultAgenda = [
+  "Review liquidity needs tied to Stanford housing and renovation payments",
+  "Discuss risk tolerance shift after dental practice sale",
+  "Evaluate municipal bond tax-loss harvesting opportunity",
+  "Confirm next steps for trust account transfer paperwork"
+];
+
+const defaultTaskDraft = {
+  assignee: "Daniel Reed, CSA",
+  amount: "$250,000",
+  dueDate: "May 3, 2026"
+};
+
+const defaultEmailDraft =
+  "Hi Robert and Anne,\n\nThank you for the productive quarterly review today. I will have Daniel prepare the trust transfer paperwork for the planned $250,000 movement by May 3. We will also send a concise analysis of the municipal bond tax-loss harvesting opportunity and how it preserves the income target.\n\nBest,\nSarah";
+
 const initialActions = [
   {
     id: "crm",
@@ -162,7 +171,7 @@ const initialActions = [
     tone: "blue",
     summary: "Update risk tolerance from Moderate to Conservative",
     confidence: 94,
-    evidence: "Meeting note: “reduce overall portfolio risk”",
+    evidence: "Meeting note: reduce overall portfolio risk",
     status: "pending"
   },
   {
@@ -172,7 +181,7 @@ const initialActions = [
     tone: "violet",
     summary: "Prepare transfer paperwork for Sterling family trust",
     confidence: 91,
-    evidence: "Meeting note: “move roughly $250,000 ... by May 3”",
+    evidence: "Meeting note: move roughly $250,000 by May 3",
     status: "pending"
   },
   {
@@ -182,48 +191,114 @@ const initialActions = [
     tone: "teal",
     summary: "Send follow-up summary with tax-loss harvesting next steps",
     confidence: 88,
-    evidence: "Meeting note: “short written summary of the tax-loss harvesting opportunity”",
+    evidence: "Meeting note: short written summary of the tax-loss harvesting opportunity",
     status: "pending"
   }
 ];
 
 const profileTabs = ["Overview", "Portfolio", "Documents", "Interactions", "AI Insights"];
+const sessionStorageKey = "aequitas-ai-demo-session-v2";
+const minimumNoteCharacters = 80;
+
+function isSterlingScenarioInput(notes, audioSelected) {
+  const normalized = notes.toLowerCase();
+  return (
+    audioSelected ||
+    (normalized.includes("sterling") &&
+      (normalized.includes("250,000") ||
+        normalized.includes("risk tolerance") ||
+        normalized.includes("stanford")))
+  );
+}
+
+function readStoredSession() {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.sessionStorage.getItem(sessionStorageKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function hydrateActions(storedActions) {
+  if (!Array.isArray(storedActions)) return initialActions;
+  const initialActionById = Object.fromEntries(initialActions.map((action) => [action.id, action]));
+  return storedActions
+    .filter((action) => initialActionById[action.id])
+    .map((action) => ({
+      ...initialActionById[action.id],
+      ...action,
+      icon: initialActionById[action.id].icon
+    }));
+}
+
+function serializeActions(actions) {
+  return actions.map(({ icon, ...action }) => action);
+}
 
 function App() {
-  const [view, setView] = useState("dashboard");
+  const [initialSession] = useState(readStoredSession);
+  const [view, setView] = useState(initialSession.view || "dashboard");
   const [toast, setToast] = useState("");
-  const [activeProfileTab, setActiveProfileTab] = useState("AI Insights");
-  const [agenda, setAgenda] = useState([
-    "Review liquidity needs tied to Stanford housing and renovation payments",
-    "Discuss risk tolerance shift after dental practice sale",
-    "Evaluate municipal bond tax-loss harvesting opportunity",
-    "Confirm next steps for trust account transfer paperwork"
-  ]);
+  const [activeProfileTab, setActiveProfileTab] = useState(
+    initialSession.activeProfileTab || "AI Insights"
+  );
+  const [agenda, setAgenda] = useState(initialSession.agenda || defaultAgenda);
   const [editingAgenda, setEditingAgenda] = useState(null);
-  const [sections, setSections] = useState({
+  const [sections, setSections] = useState(initialSession.sections || {
     snapshot: true,
     portfolio: true,
     agenda: true
   });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [audioSelected, setAudioSelected] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [audioSelected, setAudioSelected] = useState(initialSession.audioSelected || false);
+  const [notes, setNotes] = useState(initialSession.notes || "");
+  const [notesError, setNotesError] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [actions, setActions] = useState(initialActions);
-  const [riskTolerance, setRiskTolerance] = useState("Conservative");
-  const [taskDraft, setTaskDraft] = useState({
-    assignee: "Daniel Reed, CSA",
-    amount: "$250,000",
-    dueDate: "May 3, 2026"
-  });
-  const [emailDraft, setEmailDraft] = useState(
-    "Hi Robert and Anne,\n\nThank you for the productive quarterly review today. I will have Daniel prepare the trust transfer paperwork for the planned $250,000 movement by May 3. We will also send a concise analysis of the municipal bond tax-loss harvesting opportunity and how it preserves the income target.\n\nBest,\nSarah"
-  );
+  const [actions, setActions] = useState(hydrateActions(initialSession.actions));
+  const [extractionMode, setExtractionMode] = useState(initialSession.extractionMode || "scripted");
+  const [riskTolerance, setRiskTolerance] = useState(initialSession.riskTolerance || "Conservative");
+  const [taskDraft, setTaskDraft] = useState(initialSession.taskDraft || defaultTaskDraft);
+  const [emailDraft, setEmailDraft] = useState(initialSession.emailDraft || defaultEmailDraft);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [reviewModal, setReviewModal] = useState(null);
 
   const completedCount = actions.filter((action) => action.status === "complete").length;
-  const pendingCount = actions.length - completedCount;
+  const rejectedCount = actions.filter((action) => action.status === "rejected").length;
+  const changesCount = actions.filter((action) => action.status === "changes").length;
+  const pendingCount = actions.filter((action) =>
+    ["pending", "draft", "approving"].includes(action.status)
+  ).length;
+
+  useEffect(() => {
+    const nextSession = {
+      view,
+      activeProfileTab,
+      agenda,
+      sections,
+      audioSelected,
+      notes,
+      actions: serializeActions(actions),
+      extractionMode,
+      riskTolerance,
+      taskDraft,
+      emailDraft
+    };
+    window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(nextSession));
+  }, [
+    view,
+    activeProfileTab,
+    agenda,
+    sections,
+    audioSelected,
+    notes,
+    actions,
+    extractionMode,
+    riskTolerance,
+    taskDraft,
+    emailDraft
+  ]);
 
   function navigate(nextView, options = {}) {
     if (nextView === "profile") {
@@ -247,6 +322,16 @@ function App() {
   }
 
   function processNotes() {
+    const trimmedNotes = notes.trim();
+    const hasEnoughInput = trimmedNotes.length >= minimumNoteCharacters || audioSelected;
+    if (!hasEnoughInput) {
+      setNotesError(
+        `Add at least ${minimumNoteCharacters} characters of notes or select an audio file before processing.`
+      );
+      return;
+    }
+
+    setNotesError("");
     setProcessing(true);
     setProgress(0);
     const startedAt = Date.now();
@@ -257,6 +342,13 @@ function App() {
       if (nextProgress >= 100) {
         window.clearInterval(timer);
         setProcessing(false);
+        if (isSterlingScenarioInput(trimmedNotes, audioSelected)) {
+          setActions(initialActions);
+          setExtractionMode("scripted");
+        } else {
+          setActions([]);
+          setExtractionMode("needs_review");
+        }
         navigate("actions");
       }
     }, 120);
@@ -271,7 +363,7 @@ function App() {
     window.setTimeout(() => {
       setActions((current) => {
         const nextActions = current.map((action) =>
-          action.id === id ? { ...action, status: "complete" } : action
+          action.id === id ? { ...action, status: "complete", reviewNote: "" } : action
         );
         if (nextActions.every((action) => action.status === "complete")) {
           window.setTimeout(() => navigate("confirmation"), 450);
@@ -282,17 +374,69 @@ function App() {
   }
 
   function approveAll() {
-    setActions((current) => current.map((action) => ({ ...action, status: "complete" })));
-    window.setTimeout(() => navigate("confirmation"), 550);
+    setActions((current) => {
+      const nextActions = current.map((action) =>
+        ["pending", "draft"].includes(action.status)
+          ? { ...action, status: "complete", reviewNote: "" }
+          : action
+      );
+      if (nextActions.length > 0 && nextActions.every((action) => action.status === "complete")) {
+        window.setTimeout(() => navigate("confirmation"), 550);
+      }
+      return nextActions;
+    });
+  }
+
+  function saveDraftAction(id) {
+    setActions((current) =>
+      current.map((action) =>
+        action.id === id
+          ? { ...action, status: "draft", reviewNote: "Advisor edited and saved draft." }
+          : action
+      )
+    );
+    showToast("Draft saved to the audit trail.");
+  }
+
+  function completeReviewAction(id, status, reasonType, reviewNote) {
+    setActions((current) =>
+      current.map((action) =>
+        action.id === id
+          ? {
+              ...action,
+              status,
+              reasonType,
+              reviewNote
+            }
+          : action
+      )
+    );
+    setReviewModal(null);
+    showToast(status === "rejected" ? "Action rejected and logged." : "Changes requested and logged.");
   }
 
   function resetDemo() {
+    window.sessionStorage.removeItem(sessionStorageKey);
+    setView("dashboard");
+    setActiveProfileTab("AI Insights");
+    setAgenda(defaultAgenda);
+    setSections({
+      snapshot: true,
+      portfolio: true,
+      agenda: true
+    });
     setActions(initialActions);
     setNotes("");
+    setNotesError("");
     setAudioSelected(false);
     setProgress(0);
     setProcessing(false);
+    setExtractionMode("scripted");
     setRiskTolerance("Conservative");
+    setTaskDraft(defaultTaskDraft);
+    setEmailDraft(defaultEmailDraft);
+    setEmailModalOpen(false);
+    setReviewModal(null);
     navigate("dashboard");
     showToast("Prototype reset for the next validation session.");
   }
@@ -325,6 +469,8 @@ function App() {
             processing={processing}
             progress={progress}
             processNotes={processNotes}
+            notesError={notesError}
+            setNotesError={setNotesError}
           />
         )}
         {view === "actions" && (
@@ -332,6 +478,8 @@ function App() {
             actions={actions}
             approveAction={approveAction}
             approveAll={approveAll}
+            saveDraftAction={saveDraftAction}
+            openReviewModal={setReviewModal}
             riskTolerance={riskTolerance}
             setRiskTolerance={setRiskTolerance}
             taskDraft={taskDraft}
@@ -341,6 +489,10 @@ function App() {
             emailModalOpen={emailModalOpen}
             setEmailModalOpen={setEmailModalOpen}
             completedCount={completedCount}
+            rejectedCount={rejectedCount}
+            changesCount={changesCount}
+            pendingCount={pendingCount}
+            extractionMode={extractionMode}
           />
         )}
         {view === "profile" && (
@@ -353,6 +505,21 @@ function App() {
         )}
         {view === "confirmation" && <Confirmation resetDemo={resetDemo} navigate={navigate} />}
       </main>
+      {reviewModal && (
+        <ReviewDecisionModal
+          action={actions.find((action) => action.id === reviewModal.id)}
+          mode={reviewModal.mode}
+          onClose={() => setReviewModal(null)}
+          onSubmit={(reasonType, reviewNote) =>
+            completeReviewAction(
+              reviewModal.id,
+              reviewModal.mode === "reject" ? "rejected" : "changes",
+              reasonType,
+              reviewNote
+            )
+          }
+        />
+      )}
       {toast && (
         <div className="toast" role="status">
           <CheckCircle2 size={18} />
@@ -554,18 +721,8 @@ function Dashboard({ navigate }) {
       </section>
 
       <section className="surface">
-        <SectionHeader icon={BarChart3} title="Brief Readiness" />
-        <div className="chart-medium">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={readinessData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} domain={[0, 100]} />
-              <Tooltip cursor={{ fill: "#f8fafc" }} />
-              <Bar dataKey="readiness" radius={[6, 6, 0, 0]} fill="#2563eb" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <SectionHeader icon={BarChart3} title="Brief Readiness Timeline" />
+        <ReadinessTimeline />
       </section>
 
       <section className="surface">
@@ -940,8 +1097,12 @@ function NotesInput({
   setAudioSelected,
   processing,
   progress,
-  processNotes
+  processNotes,
+  notesError,
+  setNotesError
 }) {
+  const hasEnoughInput = notes.trim().length >= minimumNoteCharacters || audioSelected;
+
   return (
     <div className="page-grid notes-grid">
       <section className="summary-band">
@@ -958,7 +1119,10 @@ function NotesInput({
         <button
           className={`upload-zone ${audioSelected ? "selected" : ""}`}
           type="button"
-          onClick={() => setAudioSelected(true)}
+          onClick={() => {
+            setAudioSelected(true);
+            setNotesError("");
+          }}
         >
           <UploadCloud size={28} />
           <span>{audioSelected ? "sterling-review-audio.m4a selected" : "MP3, M4A, or WAV"}</span>
@@ -975,11 +1139,32 @@ function NotesInput({
         <textarea
           value={notes}
           onFocus={() => {
-            if (!notes) setNotes(sampleNotes);
+            if (!notes) {
+              setNotes(sampleNotes);
+              setNotesError("");
+            }
           }}
-          onChange={(event) => setNotes(event.target.value)}
+          onChange={(event) => {
+            setNotes(event.target.value);
+            if (event.target.value.trim().length >= minimumNoteCharacters) setNotesError("");
+          }}
           placeholder="Paste or dictate advisor notes from the meeting."
         />
+        {!hasEnoughInput && (
+          <div className="inline-warning">
+            <AlertTriangle size={16} />
+            <span>
+              Add at least {minimumNoteCharacters} characters of notes or select the demo audio
+              file before processing.
+            </span>
+          </div>
+        )}
+        {notesError && (
+          <div className="inline-error">
+            <AlertTriangle size={16} />
+            <span>{notesError}</span>
+          </div>
+        )}
         <div className="process-footer">
           {processing ? (
             <div className="progress-wrap" aria-label="Analyzing meeting notes">
@@ -1000,7 +1185,7 @@ function NotesInput({
           <button
             className="primary-button"
             type="button"
-            disabled={processing}
+            disabled={processing || !hasEnoughInput}
             onClick={processNotes}
           >
             {processing ? <RefreshCw className="spin" size={16} /> : <Sparkles size={16} />}
@@ -1023,6 +1208,8 @@ function ActionCenter({
   actions,
   approveAction,
   approveAll,
+  saveDraftAction,
+  openReviewModal,
   riskTolerance,
   setRiskTolerance,
   taskDraft,
@@ -1031,19 +1218,37 @@ function ActionCenter({
   setEmailDraft,
   emailModalOpen,
   setEmailModalOpen,
-  completedCount
+  completedCount,
+  rejectedCount,
+  changesCount,
+  pendingCount,
+  extractionMode
 }) {
+  const hasActions = actions.length > 0;
+  const canApproveAll = actions.some((action) => ["pending", "draft"].includes(action.status));
+
   return (
     <div className="page-grid actions-grid">
       <section className="summary-band">
         <div>
           <p className="eyebrow">Post-meeting execution · Sterling Family</p>
-          <h2>AI extracted 3 actions from your meeting notes</h2>
-          <p>Review source evidence, make edits, and approve each proposed action.</p>
+          <h2>
+            {hasActions
+              ? `AI extracted ${actions.length} actions from your meeting notes`
+              : "AI needs human review before actions can be proposed"}
+          </h2>
+          <p>
+            {hasActions
+              ? "Review source evidence, make edits, approve, reject, or request changes."
+              : "The supplied notes did not match the scripted Sterling scenario strongly enough to create confident actions."}
+          </p>
         </div>
         <div className="button-row">
-          <span className="completion-pill">{completedCount} / 3 complete</span>
-          <button className="primary-button" type="button" onClick={approveAll}>
+          <span className="completion-pill">
+            {completedCount} / {actions.length || 3} approved · {rejectedCount} rejected ·{" "}
+            {changesCount} changes
+          </span>
+          <button className="primary-button" type="button" onClick={approveAll} disabled={!canApproveAll}>
             <Check size={16} />
             Approve All
           </button>
@@ -1051,10 +1256,32 @@ function ActionCenter({
       </section>
 
       <section className="surface action-stack">
+        {extractionMode === "scripted" && hasActions && (
+          <div className="demo-mode-banner">
+            <Sparkles size={16} />
+            <span>Demo mode: scripted output generated from the Sterling sample notes.</span>
+          </div>
+        )}
+        {!hasActions && (
+          <div className="empty-extraction">
+            <SearchCheck size={34} />
+            <h3>No confident actions extracted</h3>
+            <p>
+              Add the Sterling sample notes, select the demo audio file, or provide notes with
+              client, amount, owner, date, and decision language to generate action cards.
+            </p>
+          </div>
+        )}
         {actions.map((action) => {
           if (action.id === "crm") {
             return (
-              <ActionCard key={action.id} action={action} approveAction={approveAction}>
+              <ActionCard
+                key={action.id}
+                action={action}
+                approveAction={approveAction}
+                saveDraftAction={saveDraftAction}
+                openReviewModal={openReviewModal}
+              >
                 <div className="field-row">
                   <span>Risk Tolerance</span>
                   <select
@@ -1073,7 +1300,13 @@ function ActionCenter({
 
           if (action.id === "task") {
             return (
-              <ActionCard key={action.id} action={action} approveAction={approveAction}>
+              <ActionCard
+                key={action.id}
+                action={action}
+                approveAction={approveAction}
+                saveDraftAction={saveDraftAction}
+                openReviewModal={openReviewModal}
+              >
                 <div className="task-fields">
                   <label>
                     Assignee
@@ -1108,7 +1341,13 @@ function ActionCenter({
           }
 
           return (
-            <ActionCard key={action.id} action={action} approveAction={approveAction}>
+            <ActionCard
+              key={action.id}
+              action={action}
+              approveAction={approveAction}
+              saveDraftAction={saveDraftAction}
+              openReviewModal={openReviewModal}
+            >
               <div className="email-preview">
                 <p>{emailDraft.split("\n").filter(Boolean).slice(0, 2).join(" ")}</p>
                 <button className="text-button" type="button" onClick={() => setEmailModalOpen(true)}>
@@ -1129,11 +1368,21 @@ function ActionCenter({
         </section>
         <section className="surface">
           <SectionHeader icon={Info} title="Evidence Quality" />
-          <div className="quality-score">
+          <div className={`quality-score ${hasActions ? "high" : "low"}`}>
             <Gauge size={32} />
-            <strong>High</strong>
-            <span>Clear notes, named owner, amount, and date were detected.</span>
+            <strong>{hasActions ? "High" : "Needs review"}</strong>
+            <span>
+              {hasActions
+                ? "Clear notes, named owner, amount, and date were detected."
+                : "The input was present, but it lacked enough Sterling scenario evidence for scripted actions."}
+            </span>
           </div>
+          {hasActions && (
+            <div className="quality-meta">
+              <TrustLine icon={ClipboardCheck} label="Pending review" value={`${pendingCount}`} />
+              <TrustLine icon={History} label="Decision log" value="Session storage" />
+            </div>
+          )}
         </section>
       </aside>
 
@@ -1177,13 +1426,21 @@ function ActionCenter({
   );
 }
 
-function ActionCard({ action, children, approveAction }) {
+function ActionCard({ action, children, approveAction, saveDraftAction, openReviewModal }) {
   const Icon = action.icon;
   const complete = action.status === "complete";
   const approving = action.status === "approving";
+  const rejected = action.status === "rejected";
+  const changes = action.status === "changes";
+  const draft = action.status === "draft";
+  const locked = complete || approving || rejected || changes;
 
   return (
-    <article className={`action-card ${action.tone} ${complete ? "complete" : ""} ${approving ? "approving" : ""}`}>
+    <article
+      className={`action-card ${action.tone} ${complete ? "complete" : ""} ${
+        approving ? "approving" : ""
+      } ${rejected ? "rejected" : ""} ${changes ? "changes" : ""} ${draft ? "draft" : ""}`}
+    >
       <div className="action-header">
         <span className="action-icon">
           <Icon size={18} />
@@ -1192,25 +1449,175 @@ function ActionCard({ action, children, approveAction }) {
           <h3>{action.title}</h3>
           <p>{action.summary}</p>
         </div>
-        <span className="confidence" title="Certainty based on note clarity and matching client records">
-          <Info size={13} />
-          AI Confidence: {action.confidence}%
+        <span className="action-status-stack">
+          <span className="confidence" title="Certainty based on note clarity and matching client records">
+            <Info size={13} />
+            AI Confidence: {action.confidence}%
+          </span>
+          {complete && <StatusBadge tone="ready">Approved</StatusBadge>}
+          {draft && <StatusBadge tone="neutral">Draft saved</StatusBadge>}
+          {rejected && <StatusBadge tone="rejected">Rejected</StatusBadge>}
+          {changes && <StatusBadge tone="preparing">Changes requested</StatusBadge>}
         </span>
       </div>
       <div className="action-body">{children}</div>
+      {action.reviewNote && (
+        <div className="review-note">
+          <strong>{action.reasonType || "Advisor note"}</strong>
+          <p>{action.reviewNote}</p>
+        </div>
+      )}
       <div className="action-footer">
         <EvidenceStrip sources={[action.evidence, "Advisor approval required"]} />
-        <button
-          className={complete ? "complete-button" : "secondary-button"}
-          type="button"
-          disabled={complete || approving}
-          onClick={() => approveAction(action.id)}
-        >
-          {complete ? <CheckCircle2 size={16} /> : <Check size={16} />}
-          {complete ? "Approved" : approving ? "Approving..." : "Approve"}
-        </button>
+        <div className="action-buttons">
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={locked}
+            onClick={() => saveDraftAction(action.id)}
+          >
+            <PenLine size={16} />
+            Save Draft
+          </button>
+          <button
+            className="secondary-button danger"
+            type="button"
+            disabled={locked}
+            onClick={() => openReviewModal({ id: action.id, mode: "reject" })}
+          >
+            <X size={16} />
+            Reject
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={locked}
+            onClick={() => openReviewModal({ id: action.id, mode: "changes" })}
+          >
+            <PenLine size={16} />
+            Request Changes
+          </button>
+          <button
+            className={complete ? "complete-button" : "primary-button"}
+            type="button"
+            disabled={locked}
+            onClick={() => approveAction(action.id)}
+          >
+            {complete ? <CheckCircle2 size={16} /> : <Check size={16} />}
+            {complete ? "Approved" : approving ? "Approving..." : "Approve"}
+          </button>
+        </div>
       </div>
     </article>
+  );
+}
+
+function ReviewDecisionModal({ action, mode, onClose, onSubmit }) {
+  const [reasonType, setReasonType] = useState(
+    mode === "reject" ? "Insufficient evidence" : "Needs advisor edits"
+  );
+  const [reviewNote, setReviewNote] = useState("");
+  const [error, setError] = useState("");
+  const title = mode === "reject" ? "Reject Proposed Action" : "Request Changes";
+  const description =
+    mode === "reject"
+      ? "Record why this AI-proposed action should not be executed."
+      : "Record what must change before this action can be approved.";
+  const reasons =
+    mode === "reject"
+      ? ["Insufficient evidence", "Incorrect interpretation", "Wrong client record", "Compliance concern"]
+      : ["Needs advisor edits", "Needs CSA follow-up", "Missing amount or date", "Needs supervisor review"];
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">{action?.title || "Action review"}</p>
+            <h3>{title}</h3>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <p className="modal-help">{description}</p>
+        <label className="review-field">
+          Reason
+          <select value={reasonType} onChange={(event) => setReasonType(event.target.value)}>
+            {reasons.map((reason) => (
+              <option key={reason}>{reason}</option>
+            ))}
+          </select>
+        </label>
+        <label className="review-field">
+          Required audit note
+          <textarea
+            value={reviewNote}
+            onChange={(event) => {
+              setReviewNote(event.target.value);
+              if (event.target.value.trim()) setError("");
+            }}
+            placeholder="Explain the decision for audit review."
+          />
+        </label>
+        {error && (
+          <div className="inline-error">
+            <AlertTriangle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className={mode === "reject" ? "secondary-button danger solid" : "primary-button"}
+            type="button"
+            onClick={() => {
+              if (!reviewNote.trim()) {
+                setError("An audit note is required before saving this decision.");
+                return;
+              }
+              onSubmit(reasonType, reviewNote.trim());
+            }}
+          >
+            {mode === "reject" ? <X size={16} /> : <PenLine size={16} />}
+            {mode === "reject" ? "Reject and Log" : "Request Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioSparkline() {
+  const min = Math.min(...cashFlowData.map((item) => item.portfolio));
+  const max = Math.max(...cashFlowData.map((item) => item.portfolio));
+  const width = 220;
+  const height = 72;
+  const points = cashFlowData.map((item, index) => {
+    const x = 12 + index * ((width - 24) / (cashFlowData.length - 1));
+    const ratio = (item.portfolio - min) / (max - min || 1);
+    const y = height - 14 - ratio * (height - 28);
+    return { ...item, x, y };
+  });
+  const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+
+  return (
+    <div className="sparkline-wrap" aria-label="Portfolio value rose from 27.6M in January to 28.4M in April">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img">
+        <path className="sparkline-area" d={`${path} L ${width - 12} ${height - 10} L 12 ${height - 10} Z`} />
+        <path className="sparkline-path" d={path} />
+        {points.map((point) => (
+          <circle className="sparkline-dot" key={point.month} cx={point.x} cy={point.y} r="3.5" />
+        ))}
+      </svg>
+      <div className="sparkline-months">
+        {cashFlowData.map((item) => (
+          <span key={item.month}>{item.month}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1227,14 +1634,7 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
           </p>
         </div>
         <div className="chart-small">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={cashFlowData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} hide />
-              <Tooltip />
-              <Line type="monotone" dataKey="portfolio" stroke="#2563eb" strokeWidth={3} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <PortfolioSparkline />
         </div>
       </section>
 
@@ -1362,6 +1762,34 @@ function SectionHeader({ icon: Icon, title, action }) {
         {title}
       </h2>
       {action}
+    </div>
+  );
+}
+
+function ReadinessTimeline() {
+  return (
+    <div className="readiness-timeline">
+      <div className="readiness-axis">
+        <span>Brief pending</span>
+        <span>Sources synced</span>
+        <span>Advisor-ready</span>
+      </div>
+      {meetings.map((meeting) => (
+        <div className="readiness-row" key={meeting.id}>
+          <div>
+            <strong>{meeting.time}</strong>
+            <span>{meeting.client}</span>
+          </div>
+          <div className="readiness-track">
+            <i className={meeting.badge} style={{ width: `${meeting.prep}%` }} />
+          </div>
+          <StatusBadge tone={meeting.badge}>{meeting.status}</StatusBadge>
+        </div>
+      ))}
+      <p className="metric-explainer">
+        Progress shows percent of required briefing sources synced and summarized for advisor
+        review.
+      </p>
     </div>
   );
 }
