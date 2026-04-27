@@ -163,6 +163,15 @@ const defaultTaskDraft = {
 const defaultEmailDraft =
   "Hi Robert and Anne,\n\nThank you for the productive quarterly review today. I will have Daniel prepare the trust transfer paperwork for the planned $250,000 movement by May 3. We will also send a concise analysis of the municipal bond tax-loss harvesting opportunity and how it preserves the income target.\n\nBest,\nSarah";
 
+const defaultEmailEnvelope = {
+  from: "Sarah Mitchell <sarah.mitchell@aequitas.demo>",
+  to: ["Robert Sterling <robert.sterling@example.com>", "Anne Sterling <anne.sterling@example.com>"],
+  cc: ["Daniel Reed, CSA <daniel.reed@aequitas.demo>"],
+  bcc: [],
+  subject: "Sterling quarterly review follow-up",
+  signature: "Sarah Mitchell\nSenior Wealth Advisor\nAequitas Private Wealth"
+};
+
 const initialActions = [
   {
     id: "crm",
@@ -171,6 +180,8 @@ const initialActions = [
     tone: "blue",
     summary: "Update risk tolerance from Moderate to Conservative",
     confidence: 94,
+    confidenceRationale:
+      "Strong source match between meeting note and CRM field; explicit client language; no contradicting signal.",
     evidence: "Meeting note: reduce overall portfolio risk",
     status: "pending"
   },
@@ -181,6 +192,8 @@ const initialActions = [
     tone: "violet",
     summary: "Prepare transfer paperwork for Sterling family trust",
     confidence: 91,
+    confidenceRationale:
+      "Named owner, amount, account source, and due date were detected in a single note segment.",
     evidence: "Meeting note: move roughly $250,000 by May 3",
     status: "pending"
   },
@@ -191,14 +204,102 @@ const initialActions = [
     tone: "teal",
     summary: "Send follow-up summary with tax-loss harvesting next steps",
     confidence: 88,
+    confidenceRationale:
+      "Clear follow-up request matched to portfolio alert; lower score because final recipient list still needs advisor review.",
     evidence: "Meeting note: short written summary of the tax-loss harvesting opportunity",
     status: "pending"
   }
 ];
 
-const profileTabs = ["Overview", "Portfolio", "Documents", "Interactions", "AI Insights"];
+const profileTabs = [
+  { label: "Overview", enabled: false },
+  { label: "Portfolio", enabled: false },
+  { label: "Documents", enabled: false },
+  { label: "Interactions", enabled: false },
+  { label: "AI Insights", enabled: true }
+];
 const sessionStorageKey = "aequitas-ai-demo-session-v2";
 const minimumNoteCharacters = 80;
+const sourceRecords = {
+  "Salesforce FSC": {
+    system: "Salesforce Financial Services Cloud",
+    record: "Household profile · Sterling Family",
+    updated: "Apr 18, 2026",
+    details: ["Risk profile: Moderate", "Relationship since: 2018", "Last advisor call logged by Sarah Mitchell"]
+  },
+  Calendar: {
+    system: "Advisor calendar",
+    record: "Quarterly review · 10:00 AM",
+    updated: "Apr 27, 2026",
+    details: ["Attendees: Robert Sterling, Anne Sterling, Sarah Mitchell", "Location: Office conference room"]
+  },
+  "Task history": {
+    system: "Service task queue",
+    record: "Open and completed Sterling service tasks",
+    updated: "Apr 26, 2026",
+    details: ["Renovation invoice schedule pending", "Prior trust distribution task completed Mar 12"]
+  },
+  "Tax lot report": {
+    system: "Tax lot report",
+    record: "Municipal bond sleeve unrealized loss review",
+    updated: "Apr 25, 2026",
+    details: ["Estimated harvestable loss: $42K", "Income target preserved after proposed swap"]
+  },
+  Orion: {
+    system: "Orion portfolio accounting",
+    record: "Sterling consolidated allocation",
+    updated: "Apr 26, 2026",
+    details: ["Public equity: 44%", "Target public equity: 38%", "Allocation drift: +6.8%"]
+  },
+  "Black Diamond": {
+    system: "Black Diamond performance",
+    record: "Sterling household performance dashboard",
+    updated: "Apr 26, 2026",
+    details: ["Quarter-to-date portfolio value: $28.4M", "Month-over-month value change: +$300K"]
+  },
+  IPS: {
+    system: "Investment Policy Statement",
+    record: "Sterling IPS · 2025 revision",
+    updated: "Nov 14, 2025",
+    details: ["Equity target: 38%", "Rebalance tolerance: ±5%", "Liquidity reserve: 6%"]
+  },
+  "YTD tax lot report": {
+    system: "Tax lot report",
+    record: "YTD gains/losses by sleeve",
+    updated: "Apr 25, 2026",
+    details: ["Realized gains YTD: $118K", "Offset opportunity identified in municipal bond sleeve"]
+  },
+  "Document vault": {
+    system: "Document vault",
+    record: "Sterling trust and education planning documents",
+    updated: "Apr 20, 2026",
+    details: ["Family trust agreement on file", "Stanford housing estimate uploaded"]
+  },
+  "CRM notes": {
+    system: "CRM interaction notes",
+    record: "Advisor call notes",
+    updated: "Apr 18, 2026",
+    details: ["Discussed lower volatility after practice sale", "Flagged Stanford planning milestone"]
+  },
+  "Portfolio alerts": {
+    system: "Aequitas AI alert engine",
+    record: "Tax-loss and allocation drift alerts",
+    updated: "Apr 27, 2026",
+    details: ["Tax-loss alert: Opportunity", "Allocation drift alert: Risk"]
+  },
+  "Open tasks": {
+    system: "CSA task queue",
+    record: "Sterling open service tasks",
+    updated: "Apr 27, 2026",
+    details: ["Daniel Reed assigned to transfer paperwork", "Due date: May 3, 2026"]
+  },
+  "Advisor approval required": {
+    system: "Approval policy",
+    record: "Human-in-the-loop guardrail",
+    updated: "Always on",
+    details: ["No email, CRM write-back, or task creation occurs without advisor decision"]
+  }
+};
 
 function isSterlingScenarioInput(notes, audioSelected) {
   const normalized = notes.toLowerCase();
@@ -244,7 +345,9 @@ function App() {
     initialSession.activeProfileTab || "AI Insights"
   );
   const [agenda, setAgenda] = useState(initialSession.agenda || defaultAgenda);
+  const [agendaAudit, setAgendaAudit] = useState(initialSession.agendaAudit || {});
   const [editingAgenda, setEditingAgenda] = useState(null);
+  const [editingAgendaDraft, setEditingAgendaDraft] = useState("");
   const [sections, setSections] = useState(initialSession.sections || {
     snapshot: true,
     portfolio: true,
@@ -261,8 +364,19 @@ function App() {
   const [riskTolerance, setRiskTolerance] = useState(initialSession.riskTolerance || "Conservative");
   const [taskDraft, setTaskDraft] = useState(initialSession.taskDraft || defaultTaskDraft);
   const [emailDraft, setEmailDraft] = useState(initialSession.emailDraft || defaultEmailDraft);
+  const [emailEnvelope, setEmailEnvelope] = useState(
+    initialSession.emailEnvelope || defaultEmailEnvelope
+  );
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [reviewModal, setReviewModal] = useState(null);
+  const [sourcePanel, setSourcePanel] = useState(null);
+  const [deckModalOpen, setDeckModalOpen] = useState(false);
+  const [presentationReady, setPresentationReady] = useState(
+    initialSession.presentationReady || false
+  );
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [recentActivity, setRecentActivity] = useState(initialSession.recentActivity || activity);
 
   const completedCount = actions.filter((action) => action.status === "complete").length;
   const rejectedCount = actions.filter((action) => action.status === "rejected").length;
@@ -276,6 +390,7 @@ function App() {
       view,
       activeProfileTab,
       agenda,
+      agendaAudit,
       sections,
       audioSelected,
       notes,
@@ -283,13 +398,17 @@ function App() {
       extractionMode,
       riskTolerance,
       taskDraft,
-      emailDraft
+      emailDraft,
+      emailEnvelope,
+      presentationReady,
+      recentActivity
     };
     window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(nextSession));
   }, [
     view,
     activeProfileTab,
     agenda,
+    agendaAudit,
     sections,
     audioSelected,
     notes,
@@ -297,7 +416,10 @@ function App() {
     extractionMode,
     riskTolerance,
     taskDraft,
-    emailDraft
+    emailDraft,
+    emailEnvelope,
+    presentationReady,
+    recentActivity
   ]);
 
   function navigate(nextView, options = {}) {
@@ -317,6 +439,12 @@ function App() {
     setIsGenerating(true);
     window.setTimeout(() => {
       setIsGenerating(false);
+      setPresentationReady(true);
+      setDeckModalOpen(true);
+      setRecentActivity((current) => [
+        "Generated Sterling Family client presentation package",
+        ...current.filter((item) => item !== "Generated Sterling Family client presentation package")
+      ]);
       showToast("Presentation ready. Click to download.");
     }, 2000);
   }
@@ -415,11 +543,18 @@ function App() {
     showToast(status === "rejected" ? "Action rejected and logged." : "Changes requested and logged.");
   }
 
+  function requestReset() {
+    setResetConfirmOpen(true);
+  }
+
   function resetDemo() {
     window.sessionStorage.removeItem(sessionStorageKey);
     setView("dashboard");
     setActiveProfileTab("AI Insights");
     setAgenda(defaultAgenda);
+    setAgendaAudit({});
+    setEditingAgenda(null);
+    setEditingAgendaDraft("");
     setSections({
       snapshot: true,
       portfolio: true,
@@ -435,29 +570,51 @@ function App() {
     setRiskTolerance("Conservative");
     setTaskDraft(defaultTaskDraft);
     setEmailDraft(defaultEmailDraft);
+    setEmailEnvelope(defaultEmailEnvelope);
     setEmailModalOpen(false);
     setReviewModal(null);
+    setSourcePanel(null);
+    setDeckModalOpen(false);
+    setPresentationReady(false);
+    setNotificationsOpen(false);
+    setResetConfirmOpen(false);
+    setRecentActivity(activity);
     navigate("dashboard");
     showToast("Prototype reset for the next validation session.");
   }
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} navigate={navigate} resetDemo={resetDemo} pendingCount={pendingCount} />
+      <Sidebar view={view} navigate={navigate} resetDemo={requestReset} pendingCount={pendingCount} />
       <main className="main-panel">
-        <Topbar view={view} pendingCount={pendingCount} navigate={navigate} />
-        {view === "dashboard" && <Dashboard navigate={navigate} />}
+        <Topbar
+          view={view}
+          pendingCount={pendingCount}
+          navigate={navigate}
+          notificationsOpen={notificationsOpen}
+          setNotificationsOpen={setNotificationsOpen}
+          recentActivity={recentActivity}
+        />
+        {view === "dashboard" && (
+          <Dashboard navigate={navigate} onSourceOpen={setSourcePanel} recentActivity={recentActivity} />
+        )}
         {view === "meeting" && (
           <MeetingHub
             agenda={agenda}
             setAgenda={setAgenda}
+            agendaAudit={agendaAudit}
+            setAgendaAudit={setAgendaAudit}
             editingAgenda={editingAgenda}
             setEditingAgenda={setEditingAgenda}
+            editingAgendaDraft={editingAgendaDraft}
+            setEditingAgendaDraft={setEditingAgendaDraft}
             sections={sections}
             setSections={setSections}
             isGenerating={isGenerating}
             generatePresentation={generatePresentation}
+            presentationReady={presentationReady}
             navigate={navigate}
+            onSourceOpen={setSourcePanel}
           />
         )}
         {view === "notes" && (
@@ -486,6 +643,8 @@ function App() {
             setTaskDraft={setTaskDraft}
             emailDraft={emailDraft}
             setEmailDraft={setEmailDraft}
+            emailEnvelope={emailEnvelope}
+            setEmailEnvelope={setEmailEnvelope}
             emailModalOpen={emailModalOpen}
             setEmailModalOpen={setEmailModalOpen}
             completedCount={completedCount}
@@ -493,6 +652,7 @@ function App() {
             changesCount={changesCount}
             pendingCount={pendingCount}
             extractionMode={extractionMode}
+            onSourceOpen={setSourcePanel}
           />
         )}
         {view === "profile" && (
@@ -503,8 +663,17 @@ function App() {
             showToast={showToast}
           />
         )}
-        {view === "confirmation" && <Confirmation resetDemo={resetDemo} navigate={navigate} />}
+        {view === "confirmation" && <Confirmation resetDemo={requestReset} navigate={navigate} />}
       </main>
+      {deckModalOpen && (
+        <DeckPreviewModal
+          onClose={() => setDeckModalOpen(false)}
+          onToast={showToast}
+        />
+      )}
+      {sourcePanel && (
+        <SourceRecordPanel source={sourcePanel} onClose={() => setSourcePanel(null)} />
+      )}
       {reviewModal && (
         <ReviewDecisionModal
           action={actions.find((action) => action.id === reviewModal.id)}
@@ -518,6 +687,14 @@ function App() {
               reviewNote
             )
           }
+        />
+      )}
+      {resetConfirmOpen && (
+        <ResetConfirmModal
+          approvedCount={completedCount}
+          actionCount={actions.length}
+          onCancel={() => setResetConfirmOpen(false)}
+          onConfirm={resetDemo}
         />
       )}
       {toast && (
@@ -588,7 +765,14 @@ function Sidebar({ view, navigate, resetDemo, pendingCount }) {
   );
 }
 
-function Topbar({ view, pendingCount, navigate }) {
+function Topbar({
+  view,
+  pendingCount,
+  navigate,
+  notificationsOpen,
+  setNotificationsOpen,
+  recentActivity
+}) {
   const title = {
     dashboard: "Advisor Command Center",
     meeting: "Meeting Intelligence Hub",
@@ -605,10 +789,42 @@ function Topbar({ view, pendingCount, navigate }) {
         <h1>{title}</h1>
       </div>
       <div className="topbar-actions">
-        <button className="icon-button" type="button" title="Recent AI activity">
+        <button
+          className="icon-button"
+          type="button"
+          title="Notifications"
+          onClick={() => setNotificationsOpen((open) => !open)}
+        >
           <Bell size={18} />
         </button>
-        <button className="secondary-button" type="button" onClick={() => navigate("actions")}>
+        {notificationsOpen && (
+          <div className="notifications-panel">
+            <div className="notifications-header">
+              <strong>Notifications</strong>
+              <span>{pendingCount} approvals pending</span>
+            </div>
+            <button className="notification-item" type="button" onClick={() => navigate("actions")}>
+              <ClipboardCheck size={16} />
+              <span>Review AI action queue</span>
+            </button>
+            <button className="notification-item" type="button" onClick={() => navigate("profile")}>
+              <AlertTriangle size={16} />
+              <span>Sterling allocation drift needs review</span>
+            </button>
+            {recentActivity.slice(0, 3).map((item) => (
+              <div className="notification-item passive" key={item}>
+                <History size={16} />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <button
+          className="secondary-button approval-shortcut"
+          type="button"
+          title="Open Action Center"
+          onClick={() => navigate("actions")}
+        >
           <ClipboardCheck size={16} />
           {pendingCount} approvals
         </button>
@@ -621,7 +837,7 @@ function Topbar({ view, pendingCount, navigate }) {
   );
 }
 
-function Dashboard({ navigate }) {
+function Dashboard({ navigate, onSourceOpen, recentActivity }) {
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
@@ -712,12 +928,16 @@ function Dashboard({ navigate }) {
           />
           <PreviewBlock
             tone="amber"
-            label="Decision point"
-            title="Risk profile may shift conservative"
-            text="Meeting notes and recent life events suggest the household wants less volatility after the practice sale."
+            label="Hypothesis to validate"
+            title="Risk profile may need to shift conservative"
+            text="Prior call notes and a major liquidity event indicate a lower-volatility discussion may be appropriate."
+            source="Source: prior call notes Apr 18 + life event"
           />
         </div>
-        <EvidenceStrip sources={["Salesforce FSC", "Orion", "Task history", "Tax lot report"]} />
+        <EvidenceStrip
+          sources={["Salesforce FSC", "Orion", "Task history", "Tax lot report"]}
+          onSourceOpen={onSourceOpen}
+        />
       </section>
 
       <section className="surface">
@@ -852,7 +1072,7 @@ function Dashboard({ navigate }) {
       <section className="surface">
         <SectionHeader icon={History} title="Recent Activity" />
         <div className="activity-feed">
-          {activity.map((item, index) => (
+          {recentActivity.map((item, index) => (
             <div className="activity-item" key={item}>
               <span>{index + 1}</span>
               <p>{item}</p>
@@ -875,13 +1095,19 @@ function Dashboard({ navigate }) {
 function MeetingHub({
   agenda,
   setAgenda,
+  agendaAudit,
+  setAgendaAudit,
   editingAgenda,
   setEditingAgenda,
+  editingAgendaDraft,
+  setEditingAgendaDraft,
   sections,
   setSections,
   isGenerating,
   generatePresentation,
-  navigate
+  presentationReady,
+  navigate,
+  onSourceOpen
 }) {
   return (
     <div className="page-grid meeting-grid">
@@ -937,7 +1163,10 @@ function MeetingHub({
               text="Prefers concise email summaries with tax and liquidity impacts separated."
             />
           </div>
-          <EvidenceStrip sources={["Salesforce FSC", "Calendar", "Task history", "Document vault"]} />
+          <EvidenceStrip
+            sources={["Salesforce FSC", "Calendar", "Task history", "Document vault"]}
+            onSourceOpen={onSourceOpen}
+          />
         </BriefSection>
 
         <BriefSection
@@ -976,7 +1205,10 @@ function MeetingHub({
               />
             </div>
           </div>
-          <EvidenceStrip sources={["Orion", "Black Diamond", "IPS", "YTD tax lot report"]} />
+          <EvidenceStrip
+            sources={["Orion", "Black Diamond", "IPS", "YTD tax lot report"]}
+            onSourceOpen={onSourceOpen}
+          />
         </BriefSection>
 
         <BriefSection
@@ -991,27 +1223,62 @@ function MeetingHub({
               <div className="agenda-item" key={`${item}-${index}`}>
                 <span className="agenda-number">{index + 1}</span>
                 {editingAgenda === index ? (
-                  <input
-                    value={item}
-                    onChange={(event) => {
-                      const nextAgenda = [...agenda];
-                      nextAgenda[index] = event.target.value;
-                      setAgenda(nextAgenda);
-                    }}
-                    onBlur={() => setEditingAgenda(null)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") setEditingAgenda(null);
-                    }}
-                    autoFocus
-                  />
+                  <div className="agenda-edit-wrap">
+                    <input
+                      value={editingAgendaDraft}
+                      onChange={(event) => setEditingAgendaDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          setEditingAgenda(null);
+                          setEditingAgendaDraft("");
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <div className="agenda-edit-actions">
+                      <button
+                        className="secondary-button compact-row"
+                        type="button"
+                        onClick={() => {
+                          setEditingAgenda(null);
+                          setEditingAgendaDraft("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="primary-button compact-row"
+                        type="button"
+                        onClick={() => {
+                          const nextAgenda = [...agenda];
+                          nextAgenda[index] = editingAgendaDraft;
+                          setAgenda(nextAgenda);
+                          setAgendaAudit((current) => ({
+                            ...current,
+                            [index]: "Edited by advisor"
+                          }));
+                          setEditingAgenda(null);
+                          setEditingAgendaDraft("");
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <p>{item}</p>
+                  <p>
+                    {item}
+                    {agendaAudit[index] && <span className="edited-chip">{agendaAudit[index]}</span>}
+                  </p>
                 )}
                 <button
                   className="secondary-button compact-row"
                   type="button"
                   title="Edit agenda item"
-                  onClick={() => setEditingAgenda(index)}
+                  onClick={() => {
+                    setEditingAgenda(index);
+                    setEditingAgendaDraft(item);
+                  }}
                 >
                   <Edit3 size={15} />
                   Edit
@@ -1019,7 +1286,10 @@ function MeetingHub({
               </div>
             ))}
           </div>
-          <EvidenceStrip sources={["CRM notes", "Portfolio alerts", "Open tasks"]} />
+          <EvidenceStrip
+            sources={["CRM notes", "Portfolio alerts", "Open tasks"]}
+            onSourceOpen={onSourceOpen}
+          />
         </BriefSection>
       </section>
 
@@ -1060,7 +1330,11 @@ function MeetingHub({
           <SectionHeader icon={Download} title="Presentation Package" />
           <TrustLine icon={FileText} label="Included pages" value="Brief, agenda, portfolio" />
           <TrustLine icon={BarChart3} label="Charts" value="Allocation and drift" />
-          <TrustLine icon={ShieldCheck} label="Review status" value="Advisor generated" />
+          <TrustLine
+            icon={ShieldCheck}
+            label="Review status"
+            value={presentationReady ? "Presentation ready" : "Not generated"}
+          />
           <button className="primary-button full" type="button" onClick={generatePresentation}>
             {isGenerating ? <RefreshCw className="spin" size={16} /> : <Download size={16} />}
             {isGenerating ? "Generating..." : "Generate Client Presentation"}
@@ -1216,13 +1490,16 @@ function ActionCenter({
   setTaskDraft,
   emailDraft,
   setEmailDraft,
+  emailEnvelope,
+  setEmailEnvelope,
   emailModalOpen,
   setEmailModalOpen,
   completedCount,
   rejectedCount,
   changesCount,
   pendingCount,
-  extractionMode
+  extractionMode,
+  onSourceOpen
 }) {
   const hasActions = actions.length > 0;
   const canApproveAll = actions.some((action) => ["pending", "draft"].includes(action.status));
@@ -1281,6 +1558,7 @@ function ActionCenter({
                 approveAction={approveAction}
                 saveDraftAction={saveDraftAction}
                 openReviewModal={openReviewModal}
+                onSourceOpen={onSourceOpen}
               >
                 <div className="field-row">
                   <span>Risk Tolerance</span>
@@ -1306,6 +1584,7 @@ function ActionCenter({
                 approveAction={approveAction}
                 saveDraftAction={saveDraftAction}
                 openReviewModal={openReviewModal}
+                onSourceOpen={onSourceOpen}
               >
                 <div className="task-fields">
                   <label>
@@ -1347,8 +1626,10 @@ function ActionCenter({
               approveAction={approveAction}
               saveDraftAction={saveDraftAction}
               openReviewModal={openReviewModal}
+              onSourceOpen={onSourceOpen}
             >
               <div className="email-preview">
+                <EmailEnvelopePreview envelope={emailEnvelope} compact />
                 <p>{emailDraft.split("\n").filter(Boolean).slice(0, 2).join(" ")}</p>
                 <button className="text-button" type="button" onClick={() => setEmailModalOpen(true)}>
                   View Full Draft <ArrowRight size={15} />
@@ -1364,7 +1645,12 @@ function ActionCenter({
           <SectionHeader icon={ShieldCheck} title="Approval Policy" />
           <TrustLine icon={Mail} label="Email sending" value="Explicit send required" />
           <TrustLine icon={Database} label="CRM write-back" value="Logged with before/after" />
-          <TrustLine icon={ListChecks} label="Task creation" value="Routes to CSA queue" />
+          <TrustLine
+            icon={ListChecks}
+            label="Task creation"
+            value="Routes to CSA queue"
+            hint="CSA means Client Service Associate. This mock queue is where Daniel Reed receives operational tasks."
+          />
         </section>
         <section className="surface">
           <SectionHeader icon={Info} title="Evidence Quality" />
@@ -1398,11 +1684,16 @@ function ActionCenter({
                 <X size={18} />
               </button>
             </div>
+            <EmailEnvelopeEditor envelope={emailEnvelope} setEnvelope={setEmailEnvelope} />
             <textarea
               className="modal-textarea"
               value={emailDraft}
               onChange={(event) => setEmailDraft(event.target.value)}
             />
+            <div className="signature-preview">
+              <strong>Signature preview</strong>
+              <pre>{emailEnvelope.signature}</pre>
+            </div>
             <div className="modal-footer">
               <button className="secondary-button" type="button" onClick={() => setEmailModalOpen(false)}>
                 Keep Draft
@@ -1426,7 +1717,14 @@ function ActionCenter({
   );
 }
 
-function ActionCard({ action, children, approveAction, saveDraftAction, openReviewModal }) {
+function ActionCard({
+  action,
+  children,
+  approveAction,
+  saveDraftAction,
+  openReviewModal,
+  onSourceOpen
+}) {
   const Icon = action.icon;
   const complete = action.status === "complete";
   const approving = action.status === "approving";
@@ -1450,7 +1748,7 @@ function ActionCard({ action, children, approveAction, saveDraftAction, openRevi
           <p>{action.summary}</p>
         </div>
         <span className="action-status-stack">
-          <span className="confidence" title="Certainty based on note clarity and matching client records">
+          <span className="confidence" title={action.confidenceRationale}>
             <Info size={13} />
             AI Confidence: {action.confidence}%
           </span>
@@ -1468,7 +1766,10 @@ function ActionCard({ action, children, approveAction, saveDraftAction, openRevi
         </div>
       )}
       <div className="action-footer">
-        <EvidenceStrip sources={[action.evidence, "Advisor approval required"]} />
+        <EvidenceStrip
+          sources={[action.evidence, "Advisor approval required"]}
+          onSourceOpen={onSourceOpen}
+        />
         <div className="action-buttons">
           <button
             className="secondary-button"
@@ -1509,6 +1810,67 @@ function ActionCard({ action, children, approveAction, saveDraftAction, openRevi
         </div>
       </div>
     </article>
+  );
+}
+
+function EmailEnvelopePreview({ envelope, compact = false }) {
+  return (
+    <div className={`email-envelope-preview ${compact ? "compact" : ""}`}>
+      <div>
+        <span>To</span>
+        <strong>{envelope.to.join(", ")}</strong>
+      </div>
+      <div>
+        <span>Cc</span>
+        <strong>{envelope.cc.join(", ") || "None"}</strong>
+      </div>
+      <div>
+        <span>Subject</span>
+        <strong>{envelope.subject}</strong>
+      </div>
+    </div>
+  );
+}
+
+function EmailEnvelopeEditor({ envelope, setEnvelope }) {
+  function updateList(field, value) {
+    setEnvelope((current) => ({
+      ...current,
+      [field]: value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }));
+  }
+
+  return (
+    <div className="email-envelope-editor">
+      <label>
+        From
+        <input value={envelope.from} readOnly />
+      </label>
+      <label>
+        To
+        <input value={envelope.to.join(", ")} onChange={(event) => updateList("to", event.target.value)} />
+      </label>
+      <label>
+        Cc
+        <input value={envelope.cc.join(", ")} onChange={(event) => updateList("cc", event.target.value)} />
+      </label>
+      <label>
+        Bcc
+        <input value={envelope.bcc.join(", ")} onChange={(event) => updateList("bcc", event.target.value)} />
+      </label>
+      <label className="wide">
+        Subject
+        <input
+          value={envelope.subject}
+          onChange={(event) =>
+            setEnvelope((current) => ({ ...current, subject: event.target.value }))
+          }
+        />
+      </label>
+    </div>
   );
 }
 
@@ -1590,6 +1952,141 @@ function ReviewDecisionModal({ action, mode, onClose, onSubmit }) {
   );
 }
 
+function DeckPreviewModal({ onClose, onToast }) {
+  const slides = [
+    {
+      title: "Sterling Family Brief",
+      kicker: "Quarterly Review",
+      body: "Client context, recent life events, outstanding tasks, and advisor-ready talking points."
+    },
+    {
+      title: "Suggested Agenda",
+      kicker: "Advisor editable",
+      body: "Liquidity needs, risk posture hypothesis, tax-loss harvesting, and trust transfer next steps."
+    },
+    {
+      title: "Current vs Target Allocation",
+      kicker: "Portfolio review",
+      body: "Public equity is above target; fixed income is below target; rebalance discussion recommended."
+    },
+    {
+      title: "Drift and Opportunity",
+      kicker: "AI alerts",
+      body: "$42K tax-loss harvesting opportunity and +6.8% equity drift flagged for review."
+    }
+  ];
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal deck-modal" role="dialog" aria-modal="true" aria-label="Presentation preview">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Presentation ready</p>
+            <h3>Sterling Family Client Deck</h3>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="deck-preview-grid">
+          {slides.map((slide, index) => (
+            <article className="deck-slide" key={slide.title}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <p>{slide.kicker}</p>
+              <h4>{slide.title}</h4>
+              <small>{slide.body}</small>
+            </article>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={() => onToast("PowerPoint export is mocked for this validation build.")}>
+            <PanelRightOpen size={16} />
+            Open in PowerPoint
+          </button>
+          <button className="primary-button" type="button" onClick={() => onToast("Deck download mocked for the prototype.")}>
+            <Download size={16} />
+            Download Deck
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourceRecordPanel({ source, onClose }) {
+  const record = sourceRecords[source] || {
+    system: "Meeting evidence",
+    record: source,
+    updated: "Extracted from meeting notes",
+    details: ["This evidence line is tied to the advisor-provided notes in the current session."]
+  };
+
+  return (
+    <aside className="source-panel" aria-label="Source record panel">
+      <div className="source-panel-header">
+        <div>
+          <p className="eyebrow">Source record</p>
+          <h3>{source}</h3>
+        </div>
+        <button className="icon-button" type="button" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </div>
+      <div className="source-record-card">
+        <span>System</span>
+        <strong>{record.system}</strong>
+      </div>
+      <div className="source-record-card">
+        <span>Record</span>
+        <strong>{record.record}</strong>
+      </div>
+      <div className="source-record-card">
+        <span>Last updated</span>
+        <strong>{record.updated}</strong>
+      </div>
+      <div className="source-record-card">
+        <span>Fields</span>
+        <ul>
+          {record.details.map((detail) => (
+            <li key={detail}>{detail}</li>
+          ))}
+        </ul>
+      </div>
+    </aside>
+  );
+}
+
+function ResetConfirmModal({ approvedCount, actionCount, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Confirm reset">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Reset session</p>
+            <h3>Discard current demo state?</h3>
+          </div>
+          <button className="icon-button" type="button" onClick={onCancel}>
+            <X size={18} />
+          </button>
+        </div>
+        <p className="modal-help">
+          This will discard {approvedCount} / {actionCount || 3} approvals, rejected actions, draft
+          edits, presentation state, and meeting notes from this browser session.
+        </p>
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="secondary-button danger solid" type="button" onClick={onConfirm}>
+            <RefreshCw size={16} />
+            Reset Session
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PortfolioSparkline() {
   const min = Math.min(...cashFlowData.map((item) => item.portfolio));
   const max = Math.max(...cashFlowData.map((item) => item.portfolio));
@@ -1642,12 +2139,16 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
         <div className="tabs" role="tablist">
           {profileTabs.map((tab) => (
             <button
-              key={tab}
-              className={activeTab === tab ? "active" : ""}
+              key={tab.label}
+              className={`${activeTab === tab.label ? "active" : ""} ${!tab.enabled ? "disabled" : ""}`}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              disabled={!tab.enabled}
+              title={tab.enabled ? "" : "Coming in production"}
+              onClick={() => {
+                if (tab.enabled) setActiveTab(tab.label);
+              }}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -1820,12 +2321,13 @@ function ApprovalPreview({ title, detail }) {
   );
 }
 
-function PreviewBlock({ tone, label, title, text }) {
+function PreviewBlock({ tone, label, title, text, source }) {
   return (
     <article className={`preview-block ${tone}`}>
       <span>{label}</span>
       <strong>{title}</strong>
       <p>{text}</p>
+      {source && <small>{source}</small>}
     </article>
   );
 }
@@ -1870,22 +2372,29 @@ function TrustCallout({ tone, title, text, action }) {
   );
 }
 
-function EvidenceStrip({ sources }) {
+function EvidenceStrip({ sources, onSourceOpen }) {
   return (
     <div className="evidence-strip">
       {sources.map((source) => (
-        <span key={source}>{source}</span>
+        <button
+          key={source}
+          type="button"
+          title={`Open source record: ${source}`}
+          onClick={() => onSourceOpen?.(source)}
+        >
+          {source}
+        </button>
       ))}
     </div>
   );
 }
 
-function TrustLine({ icon: Icon, label, value }) {
+function TrustLine({ icon: Icon, label, value, hint }) {
   return (
-    <div className="trust-line">
+    <div className="trust-line" title={hint || undefined}>
       <Icon size={17} />
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong className={hint ? "has-hint" : ""}>{value}</strong>
     </div>
   );
 }
