@@ -28,3 +28,18 @@ node.exe launch-serve.js 8085
 ```
 
 Then open http://127.0.0.1:8085.
+
+## Cloudflare Deploy
+
+For Cloudflare Pages, use:
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Deploy command: leave blank
+
+For Cloudflare Workers static assets, use:
+
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+
+The included `wrangler.jsonc` publishes `dist` as a single-page app.
