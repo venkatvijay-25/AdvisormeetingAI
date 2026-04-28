@@ -61,12 +61,13 @@ const meetings = [
   {
     id: "sterling",
     time: "10:00 AM",
-    client: "The Sterling Family",
+    client: "Sterling Family",
     type: "Quarterly review",
     aum: "$28.4M",
-    status: "AI Brief Ready",
+    status: "Brief Prepared",
     badge: "ready",
-    prep: 100
+    prep: 100,
+    prepNote: "9 sources synced"
   },
   {
     id: "chen",
@@ -76,7 +77,8 @@ const meetings = [
     aum: "$14.8M",
     status: "Preparing Brief",
     badge: "preparing",
-    prep: 68
+    prep: 68,
+    prepNote: "68% synced · ETA 12 min"
   },
   {
     id: "morrison",
@@ -86,12 +88,13 @@ const meetings = [
     aum: "$41.2M",
     status: "Brief Pending",
     badge: "pending",
-    prep: 24
+    prep: 24,
+    prepNote: "24% synced · retry available"
   }
 ];
 
 const activity = [
-  "Prepared Sterling Family quarterly brief from 9 connected sources",
+  "AI has prepared Sterling Family quarterly brief from 9 connected sources",
   "Flagged allocation drift in Chen Trust taxable account",
   "Created review queue entry for Morrison charitable trust memo",
   "Synced 4 approved updates to Salesforce Financial Services Cloud"
@@ -100,14 +103,14 @@ const activity = [
 const alerts = [
   {
     title: "Tax-loss harvesting window",
-    client: "The Sterling Family",
+    client: "Sterling Family",
     severity: "opportunity",
     impact: "$42K estimated offset",
     detail: "Municipal bond sleeve shows harvestable losses without altering income target."
   },
   {
     title: "Allocation drift",
-    client: "The Sterling Family",
+    client: "Sterling Family",
     severity: "risk",
     impact: "+6.8% public equity",
     detail: "Portfolio now exceeds model tolerance after recent market movement."
@@ -190,7 +193,7 @@ const initialActions = [
     title: "Task Creation",
     icon: ListChecks,
     tone: "violet",
-    summary: "Prepare transfer paperwork for Sterling family trust",
+    summary: "Prepare transfer paperwork for Sterling Family trust",
     confidence: 91,
     confidenceRationale:
       "Named owner, amount, account source, and due date were detected in a single note segment.",
@@ -298,8 +301,36 @@ const sourceRecords = {
     record: "Human-in-the-loop guardrail",
     updated: "Always on",
     details: ["No email, CRM write-back, or task creation occurs without advisor decision"]
+  },
+  "Audit record AEQ-0427-1000": {
+    system: "Immutable audit ledger",
+    record: "AEQ-0427-1000",
+    updated: "Apr 27, 2026",
+    details: [
+      "Brief generated from 9 connected sources",
+      "Advisor approval required for downstream actions",
+      "Source access and approval decisions are retained in the session log"
+    ]
   }
 };
+const focusableModalSelector =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function trapModalFocus(event) {
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll(focusableModalSelector));
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 function isSterlingScenarioInput(notes, audioSelected) {
   const normalized = notes.toLowerCase();
@@ -585,8 +616,11 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} navigate={navigate} resetDemo={requestReset} pendingCount={pendingCount} />
+      <Sidebar view={view} navigate={navigate} resetDemo={requestReset} />
       <main className="main-panel">
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {processing ? `Analyzing meeting notes, ${progress} percent complete` : toast}
+        </div>
         <Topbar
           view={view}
           pendingCount={pendingCount}
@@ -596,7 +630,12 @@ function App() {
           recentActivity={recentActivity}
         />
         {view === "dashboard" && (
-          <Dashboard navigate={navigate} onSourceOpen={setSourcePanel} recentActivity={recentActivity} />
+          <Dashboard
+            navigate={navigate}
+            onSourceOpen={setSourcePanel}
+            recentActivity={recentActivity}
+            showToast={showToast}
+          />
         )}
         {view === "meeting" && (
           <MeetingHub
@@ -707,7 +746,7 @@ function App() {
   );
 }
 
-function Sidebar({ view, navigate, resetDemo, pendingCount }) {
+function Sidebar({ view, navigate, resetDemo }) {
   const items = [
     { id: "dashboard", label: "Dashboard", icon: Gauge },
     { id: "meeting", label: "Meeting Hub", icon: BriefcaseBusiness },
@@ -741,9 +780,6 @@ function Sidebar({ view, navigate, resetDemo, pendingCount }) {
             >
               <Icon size={18} />
               <span>{item.label}</span>
-              {item.id === "actions" && pendingCount > 0 && (
-                <span className="count-pill">{pendingCount}</span>
-              )}
             </button>
           );
         })}
@@ -755,6 +791,7 @@ function Sidebar({ view, navigate, resetDemo, pendingCount }) {
           <span>Validation build</span>
         </div>
         <p>Scripted Sterling Family data. No live integrations connected.</p>
+        <p className="viewport-note">Optimized for desktop validation at 1280px or wider.</p>
       </section>
 
       <button className="ghost-button" type="button" onClick={resetDemo}>
@@ -776,7 +813,7 @@ function Topbar({
   const title = {
     dashboard: "Advisor Command Center",
     meeting: "Meeting Intelligence Hub",
-    notes: "Post-Meeting Notes",
+    notes: "Notes Workspace",
     actions: "AI Action Center",
     profile: "Sterling Family Profile",
     confirmation: "Execution Complete"
@@ -830,20 +867,20 @@ function Topbar({
         </button>
         <button className="primary-button compact" type="button" onClick={() => navigate("notes")}>
           <Mic2 size={16} />
-          New notes
+          Notes Workspace
         </button>
       </div>
     </header>
   );
 }
 
-function Dashboard({ navigate, onSourceOpen, recentActivity }) {
+function Dashboard({ navigate, onSourceOpen, recentActivity, showToast }) {
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
         <div>
           <p className="eyebrow">Today · April 27, 2026</p>
-          <h2>AI-prepared work queue for HNW client coverage</h2>
+          <h2>AI has prepared today&apos;s work queue for HNW client coverage</h2>
           <p>
             Three meetings, three pending approval items, and two proactive portfolio alerts are
             ready for advisor review.
@@ -858,7 +895,7 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
           <div className="button-row right">
             <button className="secondary-button" type="button" onClick={() => navigate("notes")}>
               <Mic2 size={16} />
-              Open Notes Workspace
+              Notes Workspace
             </button>
             <button className="primary-button" type="button" onClick={() => navigate("meeting")}>
               <FileText size={16} />
@@ -894,6 +931,16 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
                 <span className="mini-progress" aria-label={`${meeting.prep}% brief readiness`}>
                   <i style={{ width: `${meeting.prep}%` }} />
                 </span>
+                <small>{meeting.prepNote}</small>
+                {meeting.badge === "pending" && (
+                  <button
+                    className="text-button tiny"
+                    type="button"
+                    onClick={() => showToast("Source sync retry queued for the pending brief.")}
+                  >
+                    Retry Sync
+                  </button>
+                )}
               </span>
               <button className="secondary-button compact-row" type="button" onClick={() => navigate("meeting")}>
                 Full Brief <ArrowRight size={15} />
@@ -1017,8 +1064,8 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
           </p>
           <button className="primary-button full" type="button" onClick={() => navigate("notes")}>
             <Sparkles size={16} />
-            Process Meeting Notes
-          </button>
+              Notes Workspace
+            </button>
         </div>
       </section>
 
@@ -1043,7 +1090,7 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
       </section>
 
       <section className="surface">
-        <SectionHeader icon={TrendingUp} title="Advisor Time Saved" />
+          <SectionHeader icon={TrendingUp} title="Advisor Time Saved" />
         <div className="chart-medium">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={productivityData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
@@ -1067,6 +1114,10 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
             </AreaChart>
           </ResponsiveContainer>
         </div>
+        <p className="methodology-note">
+          Baseline: pre-Aequitas advisor self-reported average, March 2026 validation cohort
+          (n=12). Time saved is directional for prototype testing.
+        </p>
       </section>
 
       <section className="surface">
@@ -1087,6 +1138,33 @@ function Dashboard({ navigate, onSourceOpen, recentActivity }) {
         <TrustLine icon={Database} label="CRM write-back" value="Before/after logged" />
         <TrustLine icon={History} label="Audit record" value="AEQ-0427-1000" />
         <TrustLine icon={ShieldCheck} label="Data use" value="Firm data excluded" />
+        <div className="audit-actions">
+          <button
+            className="secondary-button full"
+            type="button"
+            onClick={() => onSourceOpen("Audit record AEQ-0427-1000")}
+          >
+            <Eye size={16} />
+            View Immutable Record
+          </button>
+          <button
+            className="secondary-button full"
+            type="button"
+            onClick={() => showToast("Audit log export is mocked for this prototype.")}
+          >
+            <Download size={16} />
+            Export Audit Log
+          </button>
+        </div>
+      </section>
+
+      <section className="surface">
+        <SectionHeader icon={Info} title="Prototype State Specs" />
+        <div className="state-spec-list">
+          <StateSpec label="No meetings today" text="Dashboard shows an empty schedule with an add/import calendar prompt." />
+          <StateSpec label="Brief still preparing" text="Meeting rows show percent synced, ETA, and a retry control if a source fails." />
+          <StateSpec label="Source error" text="Evidence chips show the failed system and route to the source record panel." />
+        </div>
       </section>
     </div>
   );
@@ -1114,7 +1192,7 @@ function MeetingHub({
       <section className="summary-band meeting-summary">
         <div>
           <p className="eyebrow">10:00 AM · Quarterly review</p>
-          <h2>The Sterling Family</h2>
+          <h2>Sterling Family</h2>
           <p>
             AI brief assembled from CRM, portfolio accounting, calendar, task history, and document
             vault sources.
@@ -1178,6 +1256,10 @@ function MeetingHub({
         >
           <div className="split-content">
             <div className="allocation-detail">
+              <div className="chart-legend" aria-label="Portfolio allocation chart legend">
+                <span><i className="current" /> Current allocation</span>
+                <span><i className="target" /> Target allocation</span>
+              </div>
               <div className="chart-large">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={allocationData} margin={{ top: 12, right: 20, left: -16, bottom: 0 }}>
@@ -1441,12 +1523,18 @@ function NotesInput({
         )}
         <div className="process-footer">
           {processing ? (
-            <div className="progress-wrap" aria-label="Analyzing meeting notes">
+            <div className="progress-wrap" role="status" aria-live="polite" aria-label="Analyzing meeting notes">
               <div className="progress-label">
                 <span>Analyzing meeting notes...</span>
                 <strong>{progress}%</strong>
               </div>
-              <div className="progress-track">
+              <div
+                className="progress-track"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={progress}
+              >
                 <span style={{ width: `${progress}%` }} />
               </div>
             </div>
@@ -1511,7 +1599,7 @@ function ActionCenter({
           <p className="eyebrow">Post-meeting execution · Sterling Family</p>
           <h2>
             {hasActions
-              ? `AI extracted ${actions.length} actions from your meeting notes`
+              ? `AI has drafted ${actions.length} actions from your meeting notes`
               : "AI needs human review before actions can be proposed"}
           </h2>
           <p>
@@ -1536,7 +1624,7 @@ function ActionCenter({
         {extractionMode === "scripted" && hasActions && (
           <div className="demo-mode-banner">
             <Sparkles size={16} />
-            <span>Demo mode: scripted output generated from the Sterling sample notes.</span>
+            <span>Demo mode: scripted output has been generated from the Sterling sample notes.</span>
           </div>
         )}
         {!hasActions && (
@@ -1673,14 +1761,20 @@ function ActionCenter({
       </aside>
 
       {emailModalOpen && (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
           <div className="modal" role="dialog" aria-modal="true" aria-label="Email draft">
             <div className="modal-header">
               <div>
                 <p className="eyebrow">Sterling Family</p>
                 <h3>Follow-up Email Draft</h3>
               </div>
-              <button className="icon-button" type="button" onClick={() => setEmailModalOpen(false)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Close email draft"
+                onClick={() => setEmailModalOpen(false)}
+                autoFocus
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1891,14 +1985,14 @@ function ReviewDecisionModal({ action, mode, onClose, onSubmit }) {
       : ["Needs advisor edits", "Needs CSA follow-up", "Missing amount or date", "Needs supervisor review"];
 
   return (
-    <div className="modal-backdrop" role="presentation">
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
       <div className="modal review-modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">{action?.title || "Action review"}</p>
             <h3>{title}</h3>
           </div>
-          <button className="icon-button" type="button" onClick={onClose}>
+          <button className="icon-button" type="button" aria-label="Close review modal" onClick={onClose} autoFocus>
             <X size={18} />
           </button>
         </div>
@@ -1977,14 +2071,14 @@ function DeckPreviewModal({ onClose, onToast }) {
   ];
 
   return (
-    <div className="modal-backdrop" role="presentation">
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
       <div className="modal deck-modal" role="dialog" aria-modal="true" aria-label="Presentation preview">
         <div className="modal-header">
           <div>
             <p className="eyebrow">Presentation ready</p>
             <h3>Sterling Family Client Deck</h3>
           </div>
-          <button className="icon-button" type="button" onClick={onClose}>
+          <button className="icon-button" type="button" aria-label="Close deck preview" onClick={onClose} autoFocus>
             <X size={18} />
           </button>
         </div>
@@ -2028,7 +2122,7 @@ function SourceRecordPanel({ source, onClose }) {
           <p className="eyebrow">Source record</p>
           <h3>{source}</h3>
         </div>
-        <button className="icon-button" type="button" onClick={onClose}>
+        <button className="icon-button" type="button" aria-label="Close source record" onClick={onClose}>
           <X size={18} />
         </button>
       </div>
@@ -2058,14 +2152,14 @@ function SourceRecordPanel({ source, onClose }) {
 
 function ResetConfirmModal({ approvedCount, actionCount, onCancel, onConfirm }) {
   return (
-    <div className="modal-backdrop" role="presentation">
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
       <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Confirm reset">
         <div className="modal-header">
           <div>
             <p className="eyebrow">Reset session</p>
             <h3>Discard current demo state?</h3>
           </div>
-          <button className="icon-button" type="button" onClick={onCancel}>
+          <button className="icon-button" type="button" aria-label="Close reset confirmation" onClick={onCancel} autoFocus>
             <X size={18} />
           </button>
         </div>
@@ -2124,7 +2218,7 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
       <section className="summary-band profile-hero">
         <div>
           <p className="eyebrow">Client since 2018 · $28.4M AUM</p>
-          <h2>The Sterling Family</h2>
+          <h2>Sterling Family</h2>
           <p>
             Multi-generational household with liquidity planning, concentrated tax events, trust
             administration, and education funding milestones.
@@ -2161,7 +2255,7 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
                 <StatusBadge tone="neutral">Updated 8:44 AM</StatusBadge>
               </div>
               <p>
-                The Sterling household is entering a more conservative planning phase after Anne's
+                Sterling Family is entering a more conservative planning phase after Anne's
                 dental practice sale and Maya's Stanford acceptance. Liquidity needs are near-term,
                 while portfolio drift and tax-loss harvesting create an opportunity to rebalance
                 without disrupting the family's income target.
@@ -2301,6 +2395,15 @@ function Metric({ label, value, icon: Icon }) {
       <Icon size={18} />
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function StateSpec({ label, text }) {
+  return (
+    <div className="state-spec">
+      <strong>{label}</strong>
+      <p>{text}</p>
     </div>
   );
 }
