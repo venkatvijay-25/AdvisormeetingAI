@@ -371,6 +371,30 @@ const meetingBriefs = {
       ["green", "Tax-loss opportunity", "$42K estimated offset in municipal bond sleeve with no material income target change."],
       ["amber", "Allocation drift", "Public equity is 6.8 points above policy target after recent market movement."]
     ],
+    relationship: [
+      { icon: Users, label: "Household", value: "Robert & Anne Sterling" },
+      { icon: BriefcaseBusiness, label: "CSA", value: "Daniel Reed" },
+      { icon: FileText, label: "CPA", value: "Coordinated by advisor" }
+    ],
+    documents: [
+      { title: "Sterling Family Trust Agreement", type: "Trust", date: "Apr 20, 2026" },
+      { title: "Investment Policy Statement", type: "IPS", date: "Nov 14, 2025" },
+      { title: "Stanford Housing Estimate", type: "Education", date: "Apr 24, 2026" }
+    ],
+    interactions: [
+      { date: "Apr 27", title: "Quarterly review completed" },
+      { date: "Apr 18", title: "Prior call flagged lower-volatility discussion" },
+      { date: "Mar 12", title: "Trust distribution task completed" }
+    ],
+    lifeEvents: [
+      { date: "Apr 2026", title: "Maya accepted to Stanford" },
+      { date: "Mar 2026", title: "Dental practice sale completed" },
+      { date: "Nov 2025", title: "Trust distribution policy updated" }
+    ],
+    milestones: [
+      { date: "May 3", title: "Trust transfer target date" },
+      { date: "Sep 14", title: "Stanford tuition funding review" }
+    ],
     agenda: defaultAgenda,
     sources: ["Salesforce FSC", "Calendar", "Task history", "Document vault"]
   },
@@ -400,6 +424,30 @@ const meetingBriefs = {
     portfolioInsights: [
       ["amber", "Illiquidity concentration", "Alternatives are 7 points above target while estate-liquidity needs are time-sensitive."],
       ["blue", "Liquidity ladder needed", "$1.2M near-term estate reserve should be modeled against credit-line draw options."]
+    ],
+    relationship: [
+      { icon: Users, label: "Trust grantor", value: "Elaine Chen" },
+      { icon: BriefcaseBusiness, label: "CSA", value: "Priya Shah" },
+      { icon: FileText, label: "CPA", value: "Marta Alvarez, CPA" }
+    ],
+    documents: [
+      { title: "Chen Trust Liquidity Plan", type: "Planning", date: "Apr 23, 2026" },
+      { title: "Estate Tax Estimate", type: "Tax", date: "Apr 19, 2026" },
+      { title: "Partnership Valuation Update", type: "Valuation", date: "Apr 12, 2026" }
+    ],
+    interactions: [
+      { date: "Apr 22", title: "Liquidity planning call completed" },
+      { date: "Apr 10", title: "CPA requested estate payment scenario" },
+      { date: "Mar 29", title: "Partnership valuation update received" }
+    ],
+    lifeEvents: [
+      { date: "Apr 2026", title: "Partnership valuation updated" },
+      { date: "Apr 2026", title: "Estate liquidity review opened" },
+      { date: "Mar 2026", title: "Credit-line options refreshed" }
+    ],
+    milestones: [
+      { date: "Jun 15", title: "Estate reserve model due" },
+      { date: "Jul 1", title: "CPA decision window" }
     ],
     agenda: [
       "Review estate-tax liquidity timeline and payment assumptions",
@@ -435,6 +483,30 @@ const meetingBriefs = {
     portfolioInsights: [
       ["amber", "Private credit funding trade-off", "Private credit is 2 points above target and may fund the charitable strategy with liquidity caveats."],
       ["blue", "Cash reserve pressure", "Cash is 3 points below target, so funding decisions should preserve the family office reserve floor."]
+    ],
+    relationship: [
+      { icon: Users, label: "Entity", value: "Morrison Family Office" },
+      { icon: BriefcaseBusiness, label: "CSA", value: "Daniel Reed" },
+      { icon: FileText, label: "Tax counsel", value: "Northstar Tax Counsel" }
+    ],
+    documents: [
+      { title: "Morrison Holdings Operating Agreement", type: "Entity", date: "Apr 16, 2026" },
+      { title: "Charitable Trust Memo Draft", type: "Planning", date: "Apr 24, 2026" },
+      { title: "YTD Tax Lot Report", type: "Tax", date: "Apr 21, 2026" }
+    ],
+    interactions: [
+      { date: "Apr 19", title: "Family office prep call completed" },
+      { date: "Apr 12", title: "CPA timing request logged" },
+      { date: "Mar 30", title: "Cash reserve floor reviewed" }
+    ],
+    lifeEvents: [
+      { date: "Apr 2026", title: "Charitable trust strategy requested" },
+      { date: "Apr 2026", title: "Private credit funding review opened" },
+      { date: "Mar 2026", title: "Reserve floor reconfirmed with family office" }
+    ],
+    milestones: [
+      { date: "May 17", title: "Charitable trust memo due" },
+      { date: "Jun 3", title: "CPA implementation review" }
     ],
     agenda: [
       "Review charitable trust memo scope and CPA timing",
@@ -753,6 +825,7 @@ function App() {
   const [activeProfileTab, setActiveProfileTab] = useState(
     initialSession.activeProfileTab || "AI Insights"
   );
+  const [meetingFocusSection, setMeetingFocusSection] = useState(null);
   const [activeMeetingId, setActiveMeetingId] = useState(initialSession.activeMeetingId || "sterling");
   const [activeNotesMeetingId, setActiveNotesMeetingId] = useState(
     initialSession.activeNotesMeetingId || "sterling"
@@ -904,8 +977,18 @@ function App() {
         setActiveMeetingId(options.meetingId);
       }
     }
-    if (nextView === "meeting" && options.meetingId) {
-      setActiveMeetingId(options.meetingId);
+    if (nextView === "meeting") {
+      if (options.meetingId) {
+        setActiveMeetingId(options.meetingId);
+      }
+      if (options.focusSection) {
+        setMeetingFocusSection(options.focusSection);
+        setSections((current) => ({ ...current, [options.focusSection]: true }));
+      } else {
+        setMeetingFocusSection(null);
+      }
+    } else {
+      setMeetingFocusSection(null);
     }
     if (nextView === "notes" && options.meetingId) {
       setActiveNotesMeetingId(options.meetingId);
@@ -1139,6 +1222,7 @@ function App() {
           notificationsOpen={notificationsOpen}
           setNotificationsOpen={setNotificationsOpen}
           recentActivity={recentActivity}
+          activeMeetingId={activeMeetingId}
         />
         {view === "dashboard" && (
           <Dashboard
@@ -1149,7 +1233,6 @@ function App() {
             debugMode={debugMode}
             syncRetries={syncRetries}
             handleRetrySync={handleRetrySync}
-            activeMeetingId={activeMeetingId}
             setActiveMeetingId={setActiveMeetingId}
             openAuditModal={() => setAuditModalOpen(true)}
           />
@@ -1172,6 +1255,8 @@ function App() {
             presentationReady={activePresentationReady}
             navigate={navigate}
             onSourceOpen={setSourcePanel}
+            focusSection={meetingFocusSection}
+            onFocusHandled={() => setMeetingFocusSection(null)}
           />
         )}
         {view === "notes" && (
@@ -1366,14 +1451,16 @@ function Topbar({
   navigate,
   notificationsOpen,
   setNotificationsOpen,
-  recentActivity
+  recentActivity,
+  activeMeetingId
 }) {
+  const activeProfileBrief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
   const title = {
     dashboard: "Advisor Command Center",
     meeting: "Meeting Intelligence Hub",
     notes: "Notes Workspace",
     actions: "AI Action Center",
-    profile: "Sterling Family Profile",
+    profile: `${activeProfileBrief.headline} Profile`,
     confirmation: "Execution Complete"
   }[view];
 
@@ -1407,7 +1494,7 @@ function Topbar({
                 <span>Review AI action queue</span>
                 <small>Action</small>
               </button>
-              <button className="notification-item" type="button" onClick={() => navigate("profile")}>
+              <button className="notification-item" type="button" onClick={() => navigate("profile", { meetingId: "sterling", tab: "Portfolio" })}>
                 <AlertTriangle size={16} />
                 <span>Sterling allocation drift needs review</span>
                 <small>Alert</small>
@@ -1444,6 +1531,17 @@ function Topbar({
   );
 }
 
+function TimeSavedTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const value = payload[0]?.value;
+  return (
+    <div className="chart-tooltip" role="status">
+      <strong>{label}: {value} hours saved</strong>
+      <span>Advisor preparation and follow-up time avoided during this validation week.</span>
+    </div>
+  );
+}
+
 function Dashboard({
   navigate,
   onSourceOpen,
@@ -1452,11 +1550,11 @@ function Dashboard({
   debugMode,
   syncRetries,
   handleRetrySync,
-  activeMeetingId,
   setActiveMeetingId,
   openAuditModal
 }) {
-  const activeBrief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
+  const priorityMeeting = meetings.find((meeting) => meeting.badge === "ready") || meetings[0];
+  const priorityBrief = meetingBriefs[priorityMeeting.id] || meetingBriefs.sterling;
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
@@ -1479,9 +1577,9 @@ function Dashboard({
               <Mic2 size={16} />
               Notes Workspace
             </button>
-            <button className="primary-button" type="button" onClick={() => navigate("meeting", { meetingId: activeMeetingId })}>
+            <button className="primary-button" type="button" onClick={() => navigate("meeting", { meetingId: priorityMeeting.id })}>
               <FileText size={16} />
-              Open {activeBrief.headline} Brief
+              Open {priorityBrief.headline} Brief
             </button>
           </div>
         </div>
@@ -1492,7 +1590,7 @@ function Dashboard({
           icon={CalendarDays}
           title="Today's Meetings"
           action={
-            <button className="text-button" type="button" onClick={() => navigate("meeting")}>
+            <button className="text-button" type="button" onClick={() => navigate("meeting", { meetingId: priorityMeeting.id })}>
               Open ready brief <ArrowRight size={15} />
             </button>
           }
@@ -1556,7 +1654,7 @@ function Dashboard({
           icon={FileText}
           title="Sterling Brief Preview"
           action={
-            <button className="text-button" type="button" onClick={() => navigate("meeting")}>
+            <button className="text-button" type="button" onClick={() => navigate("meeting", { meetingId: "sterling" })}>
               Review brief <ArrowRight size={15} />
             </button>
           }
@@ -1613,7 +1711,7 @@ function Dashboard({
           icon={PieChartIcon}
           title="Sterling Allocation"
           action={
-            <button className="text-button" type="button" onClick={() => navigate("meeting")}>
+            <button className="text-button" type="button" onClick={() => navigate("meeting", { meetingId: "sterling", focusSection: "portfolio" })}>
               Current vs target <ArrowRight size={15} />
             </button>
           }
@@ -1714,7 +1812,7 @@ function Dashboard({
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis dataKey="week" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} label={{ value: "Hours", angle: -90, position: "insideLeft" }} />
-              <Tooltip formatter={(value) => [`${value} hours`, "Advisor time saved"]} />
+              <Tooltip content={<TimeSavedTooltip />} cursor={{ stroke: "#0f766e", strokeDasharray: "4 4" }} />
               <Area
                 type="monotone"
                 dataKey="saved"
@@ -1722,6 +1820,8 @@ function Dashboard({
                 stroke="#0f766e"
                 strokeWidth={3}
                 fill="url(#savedGradient)"
+                dot={{ r: 3, strokeWidth: 2, fill: "#ffffff", stroke: "#0f766e" }}
+                activeDot={{ r: 6, strokeWidth: 2, fill: "#0f766e", stroke: "#ffffff" }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -1803,10 +1903,22 @@ function MeetingHub({
   generatePresentation,
   presentationReady,
   navigate,
-  onSourceOpen
+  onSourceOpen,
+  focusSection,
+  onFocusHandled
 }) {
   const brief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
   const agendaItems = activeMeetingId === "sterling" ? agenda : brief.agenda;
+  const portfolioSectionRef = useRef(null);
+
+  useEffect(() => {
+    if (focusSection !== "portfolio") return;
+    const timer = window.setTimeout(() => {
+      portfolioSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      onFocusHandled?.();
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeMeetingId, focusSection, onFocusHandled]);
 
   return (
     <div className="page-grid meeting-grid">
@@ -1858,6 +1970,8 @@ function MeetingHub({
           title="Portfolio Analysis"
           open={sections.portfolio}
           setSections={setSections}
+          sectionRef={portfolioSectionRef}
+          highlighted={focusSection === "portfolio"}
         >
           <div className="split-content">
             <div className="allocation-detail">
@@ -2024,9 +2138,9 @@ function MeetingHub({
   );
 }
 
-function BriefSection({ id, icon: Icon, title, open, setSections, children }) {
+function BriefSection({ id, icon: Icon, title, open, setSections, sectionRef, highlighted = false, children }) {
   return (
-    <section className="brief-section">
+    <section className={`brief-section ${highlighted ? "highlighted" : ""}`} ref={sectionRef}>
       <button
         className="brief-title"
         type="button"
@@ -2235,6 +2349,11 @@ function ActionCenter({
   const canApproveAll = batchApprovableActions.length > 0;
   const emailAction = actions.find((action) => action.id === "email");
   const emailSendAllowed = ["pending", "draft"].includes(emailAction?.status);
+  const nonEmailActions = actions.filter((action) => action.id !== "email");
+  const nonEmailActionsApproved =
+    nonEmailActions.length > 0 && nonEmailActions.every((action) => action.status === "approved");
+  const emailPendingAfterCoreApprovals =
+    nonEmailActionsApproved && emailAction && ["pending", "draft"].includes(emailAction.status);
   const allDecided = hasActions && pendingCount === 0;
   const allApproved = hasActions && completedCount === actions.length;
 
@@ -2270,7 +2389,7 @@ function ActionCenter({
         {extractionMode === "scripted" && hasActions && (
           <div className="demo-mode-banner">
             <Sparkles size={16} />
-            <span>Demo mode: scripted output has been generated from the Sterling sample notes.</span>
+            <span>Demo mode: scripted output has been generated from the {executionScenario.label} sample notes.</span>
           </div>
         )}
         {allDecided && (
@@ -2291,6 +2410,23 @@ function ActionCenter({
             <button className="primary-button compact-row" type="button" onClick={() => navigate("confirmation")}>
               View Completion
             </button>
+          </div>
+        )}
+        {emailPendingAfterCoreApprovals && !allApproved && (
+          <div className="completion-summary-card pending-email">
+            <Info size={24} />
+            <div>
+              <strong>{completedCount} of {actions.length} actions approved</strong>
+              <p>Email remains gated by explicit advisor send. Review the envelope and send confirmation before closing the workflow.</p>
+            </div>
+            <div className="button-row">
+              <button className="secondary-button compact-row" type="button" onClick={() => navigate("dashboard")}>
+                Dashboard
+              </button>
+              <button className="primary-button compact-row" type="button" onClick={() => setEmailModalOpen(true)}>
+                Review Email
+              </button>
+            </div>
           </div>
         )}
         {!hasActions && (
@@ -2754,7 +2890,12 @@ function ReviewDecisionModal({ action, mode, onClose, onSubmit }) {
 }
 
 function DeckPreviewModal({ brief, onClose, onToast }) {
+  const [deckActionMessage, setDeckActionMessage] = useState("");
   const safeFileName = brief.headline.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "");
+  const handleDeckAction = (message) => {
+    setDeckActionMessage(message);
+    onToast(message);
+  };
   const slides = [
     {
       title: `${brief.headline} Brief`,
@@ -2805,12 +2946,18 @@ function DeckPreviewModal({ brief, onClose, onToast }) {
             </article>
           ))}
         </div>
+        {deckActionMessage && (
+          <div className="deck-action-banner" role="status">
+            <CheckCircle2 size={18} />
+            <span>{deckActionMessage}</span>
+          </div>
+        )}
         <div className="modal-footer">
-          <button className="secondary-button" type="button" onClick={() => onToast(`Opening ${safeFileName}_Brief.pptx in PowerPoint preview.`)}>
+          <button className="secondary-button" type="button" onClick={() => handleDeckAction(`Opening ${safeFileName}_Brief.pptx in PowerPoint preview.`)}>
             <PanelRightOpen size={16} />
             Open in PowerPoint
           </button>
-          <button className="primary-button" type="button" onClick={() => onToast(`Downloading ${safeFileName}_Brief.pptx...`)}>
+          <button className="primary-button" type="button" onClick={() => handleDeckAction(`Downloading ${safeFileName}_Brief.pptx...`)}>
             <Download size={16} />
             Download Deck
           </button>
@@ -3220,9 +3367,9 @@ function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
         <section className="profile-summary-card">
           <h3>Relationship Map</h3>
           <div className="relationship-grid">
-            <TrustLine icon={Users} label="Household" value="Robert & Anne Sterling" />
-            <TrustLine icon={BriefcaseBusiness} label="CSA" value="Daniel Reed" />
-            <TrustLine icon={FileText} label="CPA" value="Coordinated by advisor" />
+            {brief.relationship.map((line) => (
+              <TrustLine key={line.label} icon={line.icon} label={line.label} value={line.value} />
+            ))}
           </div>
         </section>
       </div>
@@ -3239,16 +3386,9 @@ function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
         <section className="profile-summary-card">
           <h3>Allocation Notes</h3>
           <div className="callout-list">
-            <TrustCallout
-              tone="amber"
-              title="Public equity drift"
-              text="Current public equity is 44%, above the 38% target and outside the tolerance band."
-            />
-            <TrustCallout
-              tone="green"
-              title="Tax-loss harvesting"
-              text="$42K estimated offset is available in the municipal bond sleeve."
-            />
+            {brief.portfolioInsights.map(([tone, title, text]) => (
+              <TrustCallout key={title} tone={tone} title={title} text={text} />
+            ))}
           </div>
         </section>
       </div>
@@ -3261,9 +3401,14 @@ function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
         <section className="profile-summary-card">
           <h3>Document Vault</h3>
           <div className="document-list">
-            <DocumentRow title="Sterling Family Trust Agreement" type="Trust" date="Apr 20, 2026" />
-            <DocumentRow title="Investment Policy Statement" type="IPS" date="Nov 14, 2025" />
-            <DocumentRow title="Stanford Housing Estimate" type="Education" date="Apr 24, 2026" />
+            {brief.documents.map((document) => (
+              <DocumentRow
+                key={document.title}
+                title={document.title}
+                type={document.type}
+                date={document.date}
+              />
+            ))}
           </div>
         </section>
         <section className="profile-summary-card">
@@ -3283,9 +3428,9 @@ function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
       <div className="profile-tab-panel">
         <section className="profile-summary-card">
           <h3>Recent Interactions</h3>
-          <TimelineItem date="Apr 27" title="Quarterly review completed" />
-          <TimelineItem date="Apr 18" title="Prior call flagged lower-volatility discussion" />
-          <TimelineItem date="Mar 12" title="Trust distribution task completed" />
+          {brief.interactions.map((interaction) => (
+            <TimelineItem key={interaction.title} date={interaction.date} title={interaction.title} />
+          ))}
         </section>
         <section className="profile-summary-card">
           <h3>Next Best Actions</h3>
@@ -3320,47 +3465,47 @@ function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
 
       <section className="timeline">
         <h3>Key Life Events</h3>
-        <TimelineItem date="Apr 2026" title="Maya accepted to Stanford" />
-        <TimelineItem date="Mar 2026" title="Dental practice sale completed" />
-        <TimelineItem date="Nov 2025" title="Trust distribution policy updated" />
+        {brief.lifeEvents.map((event) => (
+          <TimelineItem key={event.title} date={event.date} title={event.title} />
+        ))}
       </section>
 
       <section className="profile-alerts">
         <h3>Proactive AI Alerts</h3>
         <div className="callout-list">
-          <TrustCallout
-            tone="green"
-            title="Tax-loss harvesting opportunity"
-            text="$42K estimated offset available in municipal bond sleeve."
-            action={
-              <button className="secondary-button" type="button" onClick={() => navigate("actions")}>
-                <Check size={16} />
-                Take Action
-              </button>
-            }
-          />
-          <TrustCallout
-            tone="amber"
-            title="Allocation drift risk"
-            text="Public equity has moved outside the IPS tolerance band."
-            action={
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => showToast("Detailed analysis marked for future integration.")}
-              >
-                <BarChart3 size={16} />
-                View Analysis
-              </button>
-            }
-          />
+          {brief.portfolioInsights.map(([tone, title, text], index) => (
+            <TrustCallout
+              key={title}
+              tone={tone}
+              title={title}
+              text={text}
+              action={
+                index === 0 ? (
+                  <button className="secondary-button" type="button" onClick={() => navigate("actions")}>
+                    <Check size={16} />
+                    Take Action
+                  </button>
+                ) : (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => showToast(`${brief.headline} analysis marked for advisor review.`)}
+                  >
+                    <BarChart3 size={16} />
+                    View Analysis
+                  </button>
+                )
+              }
+            />
+          ))}
         </div>
       </section>
 
       <section className="upcoming">
         <h3>Upcoming Milestones</h3>
-        <Milestone date="May 3" title="Trust transfer target date" />
-        <Milestone date="Sep 14" title="Stanford tuition funding review" />
+        {brief.milestones.map((milestone) => (
+          <Milestone key={milestone.title} date={milestone.date} title={milestone.title} />
+        ))}
       </section>
     </div>
   );

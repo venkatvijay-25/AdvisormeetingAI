@@ -912,6 +912,29 @@ button:disabled {
   height: 230px;
 }
 
+.chart-tooltip {
+  display: grid;
+  gap: 4px;
+  max-width: 220px;
+  padding: 10px 12px;
+  color: var(--navy);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+}
+
+.chart-tooltip strong,
+.chart-tooltip span {
+  display: block;
+}
+
+.chart-tooltip span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .chart-large {
   width: 100%;
   height: 320px;
@@ -1186,6 +1209,13 @@ button:disabled {
 
 .brief-section {
   border-bottom: 1px solid var(--line);
+  scroll-margin-top: 24px;
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+.brief-section.highlighted {
+  background: #eff6ff;
+  box-shadow: inset 4px 0 0 var(--blue);
 }
 
 .brief-section:last-child {
@@ -2105,6 +2135,15 @@ button:disabled {
   color: var(--green);
 }
 
+.completion-summary-card.pending-email {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.completion-summary-card.pending-email > svg {
+  color: var(--gold);
+}
+
 .completion-summary-card strong,
 .completion-summary-card p {
   display: block;
@@ -2256,6 +2295,24 @@ button:disabled {
 .deck-slide small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.deck-action-banner {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: -4px 0 14px;
+  padding: 11px 12px;
+  color: #14532d;
+  font-weight: 850;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.deck-action-banner svg {
+  flex: 0 0 auto;
+  color: var(--green);
 }
 
 .deck-slide-mock {
