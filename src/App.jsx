@@ -367,6 +367,10 @@ const meetingBriefs = {
       ["green", "Client preference", "Prefers concise email summaries with tax and liquidity impacts separated."]
     ],
     allocation: allocationData,
+    portfolioInsights: [
+      ["green", "Tax-loss opportunity", "$42K estimated offset in municipal bond sleeve with no material income target change."],
+      ["amber", "Allocation drift", "Public equity is 6.8 points above policy target after recent market movement."]
+    ],
     agenda: defaultAgenda,
     sources: ["Salesforce FSC", "Calendar", "Task history", "Document vault"]
   },
@@ -392,6 +396,10 @@ const meetingBriefs = {
       { name: "Alternatives", current: 33, target: 26 },
       { name: "Cash", current: 9, target: 8 },
       { name: "Private Credit", current: 3, target: 4 }
+    ],
+    portfolioInsights: [
+      ["amber", "Illiquidity concentration", "Alternatives are 7 points above target while estate-liquidity needs are time-sensitive."],
+      ["blue", "Liquidity ladder needed", "$1.2M near-term estate reserve should be modeled against credit-line draw options."]
     ],
     agenda: [
       "Review estate-tax liquidity timeline and payment assumptions",
@@ -423,6 +431,10 @@ const meetingBriefs = {
       { name: "Alternatives", current: 22, target: 18 },
       { name: "Cash", current: 7, target: 10 },
       { name: "Private Credit", current: 17, target: 15 }
+    ],
+    portfolioInsights: [
+      ["amber", "Private credit funding trade-off", "Private credit is 2 points above target and may fund the charitable strategy with liquidity caveats."],
+      ["blue", "Cash reserve pressure", "Cash is 3 points below target, so funding decisions should preserve the family office reserve floor."]
     ],
     agenda: [
       "Review charitable trust memo scope and CPA timing",
@@ -777,9 +789,15 @@ function App() {
   const [reviewModal, setReviewModal] = useState(null);
   const [sourcePanel, setSourcePanel] = useState(null);
   const [deckModalOpen, setDeckModalOpen] = useState(false);
-  const [presentationReady, setPresentationReady] = useState(
-    initialSession.presentationReady || false
+  const [presentationReadyByMeeting, setPresentationReadyByMeeting] = useState(() => {
+    if (initialSession.presentationReadyByMeeting) return initialSession.presentationReadyByMeeting;
+    return initialSession.presentationReady ? { sterling: true } : {};
+  });
+  const [activeDeckMeetingId, setActiveDeckMeetingId] = useState(
+    initialSession.activeDeckMeetingId || "sterling"
   );
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [csaQueueOpen, setCsaQueueOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [recentActivity, setRecentActivity] = useState(initialSession.recentActivity || activity);
@@ -795,6 +813,7 @@ function App() {
   const batchApprovableActions = actions.filter(
     (action) => action.id !== "email" && ["pending", "draft"].includes(action.status)
   );
+  const activePresentationReady = Boolean(presentationReadyByMeeting[activeMeetingId]);
 
   useEffect(() => {
     const nextSession = {
@@ -814,7 +833,8 @@ function App() {
       taskDraft,
       emailDraft,
       emailEnvelope,
-      presentationReady,
+      presentationReadyByMeeting,
+      activeDeckMeetingId,
       recentActivity,
       syncRetries
     };
@@ -836,7 +856,8 @@ function App() {
     taskDraft,
     emailDraft,
     emailEnvelope,
-    presentationReady,
+    presentationReadyByMeeting,
+    activeDeckMeetingId,
     recentActivity,
     syncRetries
   ]);
@@ -904,25 +925,36 @@ function App() {
   }
 
   function generatePresentation() {
+    const brief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
     setIsGenerating(true);
     window.setTimeout(() => {
       setIsGenerating(false);
-      setPresentationReady(true);
+      setPresentationReadyByMeeting((current) => ({ ...current, [activeMeetingId]: true }));
+      setActiveDeckMeetingId(activeMeetingId);
       setDeckModalOpen(true);
+      const activityItem = `Generated ${brief.headline} client presentation package`;
       setRecentActivity((current) => [
-        "Generated Sterling Family client presentation package",
-        ...current.filter((item) => item !== "Generated Sterling Family client presentation package")
+        activityItem,
+        ...current.filter((item) => item !== activityItem)
       ]);
-      showToast("Presentation ready. Click to download.");
+      showToast(`${brief.headline} presentation ready. Review or download from the preview.`);
     }, 2000);
   }
 
   function handleRetrySync(meetingId) {
-    setSyncRetries((current) => ({ ...current, [meetingId]: "syncing" }));
+    const startingProgress = meetings.find((meeting) => meeting.id === meetingId)?.prep || 0;
+    const nextProgress = Math.min(100, startingProgress + 7);
+    setSyncRetries((current) => ({
+      ...current,
+      [meetingId]: { status: "syncing", progress: nextProgress }
+    }));
     setLiveMessage(`${meetingBriefs[meetingId]?.headline || "Brief"} source sync retry started.`);
     window.setTimeout(() => {
-      setSyncRetries((current) => ({ ...current, [meetingId]: "queued" }));
-      showToast(`${meetingBriefs[meetingId]?.headline || "Brief"} source sync retry queued.`);
+      setSyncRetries((current) => ({
+        ...current,
+        [meetingId]: { status: "queued", progress: Math.min(100, nextProgress + 3) }
+      }));
+      showToast(`${meetingBriefs[meetingId]?.headline || "Brief"} sync retried. Progress moved to ${Math.min(100, nextProgress + 3)}%.`);
     }, 900);
   }
 
@@ -1078,7 +1110,10 @@ function App() {
     setReviewModal(null);
     setSourcePanel(null);
     setDeckModalOpen(false);
-    setPresentationReady(false);
+    setPresentationReadyByMeeting({});
+    setActiveDeckMeetingId("sterling");
+    setAuditModalOpen(false);
+    setCsaQueueOpen(false);
     setNotificationsOpen(false);
     setResetConfirmOpen(false);
     setRecentActivity(activity);
@@ -1114,6 +1149,9 @@ function App() {
             debugMode={debugMode}
             syncRetries={syncRetries}
             handleRetrySync={handleRetrySync}
+            activeMeetingId={activeMeetingId}
+            setActiveMeetingId={setActiveMeetingId}
+            openAuditModal={() => setAuditModalOpen(true)}
           />
         )}
         {view === "meeting" && (
@@ -1131,7 +1169,7 @@ function App() {
             setSections={setSections}
             isGenerating={isGenerating}
             generatePresentation={generatePresentation}
-            presentationReady={presentationReady}
+            presentationReady={activePresentationReady}
             navigate={navigate}
             onSourceOpen={setSourcePanel}
           />
@@ -1178,6 +1216,8 @@ function App() {
             extractionMode={extractionMode}
             executionScenario={scenarioConfigs[executionMeetingId] || scenarioConfigs.sterling}
             onSourceOpen={setSourcePanel}
+            openCsaQueue={() => setCsaQueueOpen(true)}
+            navigate={navigate}
           />
         )}
         {view === "profile" && (
@@ -1193,6 +1233,7 @@ function App() {
       </main>
       {deckModalOpen && (
         <DeckPreviewModal
+          brief={meetingBriefs[activeDeckMeetingId] || meetingBriefs.sterling}
           onClose={() => setDeckModalOpen(false)}
           onToast={showToast}
         />
@@ -1223,7 +1264,7 @@ function App() {
           draftCount={draftCount}
           actionCount={actions.length}
           hasNotes={Boolean(notes.trim())}
-          presentationReady={presentationReady}
+          presentationReady={Object.values(presentationReadyByMeeting).some(Boolean)}
           onCancel={() => setResetConfirmOpen(false)}
           onConfirm={resetDemo}
         />
@@ -1240,6 +1281,15 @@ function App() {
             approveAll();
           }}
         />
+      )}
+      {auditModalOpen && (
+        <AuditLogModal
+          onClose={() => setAuditModalOpen(false)}
+          onExport={() => showToast("Exporting AEQ-0427-1000_audit_log.csv for validation review.")}
+        />
+      )}
+      {csaQueueOpen && (
+        <CsaQueueModal onClose={() => setCsaQueueOpen(false)} taskDraft={taskDraft} />
       )}
       {toast && (
         <div className="toast" role="status">
@@ -1298,7 +1348,7 @@ function Sidebar({ view, navigate, resetDemo }) {
           <span className="pulse-dot" />
           <span>Validation build</span>
         </div>
-        <p>Scripted Sterling Family data. No live integrations connected.</p>
+        <p>Scripted multi-client validation data. No live integrations connected.</p>
         <p className="viewport-note">Optimized for desktop validation at 1280px or wider.</p>
       </section>
 
@@ -1401,8 +1451,12 @@ function Dashboard({
   showToast,
   debugMode,
   syncRetries,
-  handleRetrySync
+  handleRetrySync,
+  activeMeetingId,
+  setActiveMeetingId,
+  openAuditModal
 }) {
+  const activeBrief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
@@ -1425,9 +1479,9 @@ function Dashboard({
               <Mic2 size={16} />
               Notes Workspace
             </button>
-            <button className="primary-button" type="button" onClick={() => navigate("meeting")}>
+            <button className="primary-button" type="button" onClick={() => navigate("meeting", { meetingId: activeMeetingId })}>
               <FileText size={16} />
-              Open Full Brief
+              Open {activeBrief.headline} Brief
             </button>
           </div>
         </div>
@@ -1446,12 +1500,13 @@ function Dashboard({
         <div className="meeting-list">
           {meetings.map((meeting) => {
             const retryState = syncRetries[meeting.id];
-            const isRetrying = retryState === "syncing";
+            const isRetrying = retryState?.status === "syncing";
+            const retryProgress = retryState?.progress || meeting.prep;
             const prepNote =
-              retryState === "queued"
-                ? "Retry queued - next sync in 3 min"
+              retryState?.status === "queued"
+                ? `Retry queued - ${retryProgress}% synced`
                 : isRetrying
-                  ? "Retrying source sync..."
+                  ? `Retrying source sync - ${retryProgress}%`
                   : meeting.prepNote;
             return (
             <article
@@ -1465,8 +1520,8 @@ function Dashboard({
               </span>
               <span className="meeting-readiness">
                 <StatusBadge tone={meeting.badge}>{meeting.status}</StatusBadge>
-                <span className="mini-progress" aria-label={`${meeting.prep}% brief readiness`}>
-                  <i style={{ width: `${meeting.prep}%` }} />
+                <span className="mini-progress" aria-label={`${retryProgress}% brief readiness`}>
+                  <i className={isRetrying ? "syncing" : ""} style={{ width: `${retryProgress}%` }} />
                 </span>
                 <small>{prepNote}</small>
                 {meeting.badge === "pending" && (
@@ -1483,7 +1538,10 @@ function Dashboard({
               <button
                 className="secondary-button compact-row"
                 type="button"
-                onClick={() => navigate("meeting", { meetingId: meeting.id })}
+                onClick={() => {
+                  setActiveMeetingId(meeting.id);
+                  navigate("meeting", { meetingId: meeting.id });
+                }}
               >
                 Full Brief <ArrowRight size={15} />
               </button>
@@ -1699,7 +1757,7 @@ function Dashboard({
           <button
             className="secondary-button full"
             type="button"
-            onClick={() => onSourceOpen("Audit record AEQ-0427-1000")}
+            onClick={openAuditModal}
           >
             <Eye size={16} />
             View Immutable Record
@@ -1707,7 +1765,7 @@ function Dashboard({
           <button
             className="secondary-button full"
             type="button"
-            onClick={() => showToast("Audit log export is mocked for this prototype.")}
+            onClick={() => showToast("Exporting AEQ-0427-1000_audit_log.csv for validation review.")}
           >
             <Download size={16} />
             Export Audit Log
@@ -1831,16 +1889,9 @@ function MeetingHub({
               <AllocationComparison data={brief.allocation} />
             </div>
             <div className="callout-list">
-              <TrustCallout
-                tone="green"
-                title="Tax-loss opportunity"
-                text="$42K estimated offset in municipal bond sleeve with no material income target change."
-              />
-              <TrustCallout
-                tone="amber"
-                title="Allocation drift"
-                text="Public equity is 6.8 points above policy target after recent market movement."
-              />
+              {brief.portfolioInsights.map(([tone, title, text]) => (
+                <TrustCallout key={title} tone={tone} title={title} text={text} />
+              ))}
             </div>
           </div>
           <EvidenceStrip
@@ -2176,13 +2227,16 @@ function ActionCenter({
   batchApprovableActions,
   extractionMode,
   executionScenario,
-  onSourceOpen
+  onSourceOpen,
+  openCsaQueue,
+  navigate
 }) {
   const hasActions = actions.length > 0;
   const canApproveAll = batchApprovableActions.length > 0;
   const emailAction = actions.find((action) => action.id === "email");
   const emailSendAllowed = ["pending", "draft"].includes(emailAction?.status);
   const allDecided = hasActions && pendingCount === 0;
+  const allApproved = hasActions && completedCount === actions.length;
 
   return (
     <div className="page-grid actions-grid">
@@ -2225,6 +2279,18 @@ function ActionCenter({
             <span>
               All clear: no pending AI actions remain. The audit summary stays visible for review.
             </span>
+          </div>
+        )}
+        {allApproved && (
+          <div className="completion-summary-card">
+            <CheckCircle2 size={24} />
+            <div>
+              <strong>All {actions.length} actions approved</strong>
+              <p>CRM, CSA task routing, email send decision, and audit evidence are ready for the post-meeting completion record.</p>
+            </div>
+            <button className="primary-button compact-row" type="button" onClick={() => navigate("confirmation")}>
+              View Completion
+            </button>
           </div>
         )}
         {!hasActions && (
@@ -2320,8 +2386,9 @@ function ActionCenter({
                 <EmailEnvelopePreview envelope={emailEnvelope} compact />
                 <div className="email-inline-copy">
                   <StatusBadge tone="neutral">Editable draft</StatusBadge>
-                  <p>{emailDraft.split("\n").filter(Boolean).slice(0, 2).join(" ")}</p>
-                  <small>Full envelope, body, subject, signature, and send confirmation open in the draft review modal.</small>
+                  <strong>{emailEnvelope.subject}</strong>
+                  <p>{emailDraft.split("\n").filter(Boolean)[0]}</p>
+                  <small>Review the full body, envelope, signature, and send confirmation before execution.</small>
                 </div>
                 <button className="secondary-button compact-row" type="button" onClick={() => setEmailModalOpen(true)}>
                   <Eye size={15} />
@@ -2344,7 +2411,7 @@ function ActionCenter({
             value="Routes to CSA queue"
             hint="CSA means Client Service Associate. This mock queue is where Daniel Reed receives operational tasks."
           />
-          <button className="text-button policy-link" type="button" onClick={() => onSourceOpen("Open tasks")}>
+          <button className="text-button policy-link" type="button" onClick={openCsaQueue}>
             Open mock CSA queue <ArrowRight size={15} />
           </button>
         </section>
@@ -2373,7 +2440,7 @@ function ActionCenter({
           <div className="modal" role="dialog" aria-modal="true" aria-label="Email draft">
             <div className="modal-header">
               <div>
-                <p className="eyebrow">Sterling Family</p>
+                <p className="eyebrow">{executionScenario.label}</p>
                 <h3>Follow-up Email Draft</h3>
               </div>
               <button
@@ -2686,30 +2753,31 @@ function ReviewDecisionModal({ action, mode, onClose, onSubmit }) {
   );
 }
 
-function DeckPreviewModal({ onClose, onToast }) {
+function DeckPreviewModal({ brief, onClose, onToast }) {
+  const safeFileName = brief.headline.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "");
   const slides = [
     {
-      title: "Sterling Family Brief",
-      kicker: "Quarterly Review",
+      title: `${brief.headline} Brief`,
+      kicker: brief.eyebrow.split(" - ")[1] || "Client Review",
       body: "Client context, recent life events, outstanding tasks, and advisor-ready talking points.",
       type: "brief"
     },
     {
       title: "Suggested Agenda",
       kicker: "Advisor editable",
-      body: "Liquidity needs, risk posture hypothesis, tax-loss harvesting, and trust transfer next steps.",
+      body: brief.agenda.slice(0, 3).join("; "),
       type: "agenda"
     },
     {
       title: "Current vs Target Allocation",
       kicker: "Portfolio review",
-      body: "Public equity is above target; fixed income is below target; rebalance discussion recommended.",
+      body: "Current and target allocation are shown with client-specific drift indicators.",
       type: "allocation"
     },
     {
       title: "Drift and Opportunity",
       kicker: "AI alerts",
-      body: "$42K tax-loss harvesting opportunity and +6.8% equity drift flagged for review.",
+      body: brief.portfolioInsights.map(([, title]) => title).join("; "),
       type: "alerts"
     }
   ];
@@ -2720,7 +2788,7 @@ function DeckPreviewModal({ onClose, onToast }) {
         <div className="modal-header">
           <div>
             <p className="eyebrow">Presentation ready</p>
-            <h3>Sterling Family Client Deck</h3>
+            <h3>{brief.headline} Client Deck</h3>
           </div>
           <button className="icon-button" type="button" aria-label="Close deck preview" onClick={onClose} autoFocus>
             <X size={18} />
@@ -2732,17 +2800,17 @@ function DeckPreviewModal({ onClose, onToast }) {
               <span>{String(index + 1).padStart(2, "0")}</span>
               <p>{slide.kicker}</p>
               <h4>{slide.title}</h4>
-              <DeckSlideMock type={slide.type} />
+              <DeckSlideMock type={slide.type} brief={brief} />
               <small>{slide.body}</small>
             </article>
           ))}
         </div>
         <div className="modal-footer">
-          <button className="secondary-button" type="button" onClick={() => onToast("PowerPoint export is mocked for this validation build.")}>
+          <button className="secondary-button" type="button" onClick={() => onToast(`Opening ${safeFileName}_Brief.pptx in PowerPoint preview.`)}>
             <PanelRightOpen size={16} />
             Open in PowerPoint
           </button>
-          <button className="primary-button" type="button" onClick={() => onToast("Deck download mocked for the prototype.")}>
+          <button className="primary-button" type="button" onClick={() => onToast(`Downloading ${safeFileName}_Brief.pptx...`)}>
             <Download size={16} />
             Download Deck
           </button>
@@ -2752,13 +2820,13 @@ function DeckPreviewModal({ onClose, onToast }) {
   );
 }
 
-function DeckSlideMock({ type }) {
+function DeckSlideMock({ type, brief }) {
   if (type === "agenda") {
     return (
       <div className="deck-slide-mock agenda">
-        <span>01 Liquidity needs</span>
-        <span>02 Risk posture</span>
-        <span>03 Tax-loss opportunity</span>
+        {brief.agenda.slice(0, 3).map((item, index) => (
+          <span key={item}>{String(index + 1).padStart(2, "0")} {item}</span>
+        ))}
       </div>
     );
   }
@@ -2766,7 +2834,7 @@ function DeckSlideMock({ type }) {
   if (type === "allocation") {
     return (
       <div className="deck-slide-mock allocation">
-        {allocationData.slice(0, 4).map((item) => (
+        {brief.allocation.slice(0, 4).map((item) => (
           <i key={item.name} style={{ height: `${Math.max(item.current, 12)}%` }} />
         ))}
       </div>
@@ -2776,19 +2844,105 @@ function DeckSlideMock({ type }) {
   if (type === "alerts") {
     return (
       <div className="deck-slide-mock alerts">
-        <strong>$42K</strong>
-        <span>Tax-loss offset</span>
-        <strong>+6.8%</strong>
-        <span>Equity drift</span>
+        {brief.portfolioInsights.slice(0, 2).map(([, title, text]) => (
+          <React.Fragment key={title}>
+            <strong>{title.split(" ")[0]}</strong>
+            <span>{text}</span>
+          </React.Fragment>
+        ))}
       </div>
     );
   }
 
   return (
     <div className="deck-slide-mock brief">
-      <strong>Sterling Family</strong>
-      <span>AUM $28.4M</span>
-      <span>Risk hypothesis: conservative shift</span>
+      <strong>{brief.headline}</strong>
+      <span>AUM {brief.facts.find(([label]) => label === "AUM")?.[1] || "On file"}</span>
+      <span>{brief.callouts[0]?.[2]}</span>
+    </div>
+  );
+}
+
+function AuditLogModal({ onClose, onExport }) {
+  const auditRows = [
+    ["10:00 AM", "Brief generated", "9 source records read and summarized"],
+    ["10:03 AM", "Evidence opened", "Salesforce FSC, Orion, Tax lot report"],
+    ["10:52 AM", "Notes processed", "3 AI-proposed actions created"],
+    ["10:55 AM", "Approval policy", "Email send, CRM write-back, and CSA task require advisor approval"]
+  ];
+
+  return (
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
+      <div className="modal audit-modal" role="dialog" aria-modal="true" aria-label="Immutable audit record">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Immutable audit record</p>
+            <h3>AEQ-0427-1000</h3>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close audit record" onClick={onClose} autoFocus>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="audit-record-table">
+          {auditRows.map(([time, event, detail]) => (
+            <div className="audit-record-row" key={`${time}-${event}`}>
+              <span>{time}</span>
+              <strong>{event}</strong>
+              <p>{detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={onClose}>
+            Close
+          </button>
+          <button className="primary-button" type="button" onClick={onExport}>
+            <Download size={16} />
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CsaQueueModal({ onClose, taskDraft }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Mock CSA queue">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Client Service Associate queue</p>
+            <h3>Operational Intake</h3>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close CSA queue" onClick={onClose} autoFocus>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="queue-list">
+          <div className="queue-row active">
+            <ListChecks size={18} />
+            <span>
+              <strong>{taskDraft.amount || "Client follow-up task"}</strong>
+              <small>Assigned to {taskDraft.assignee} - Due {taskDraft.dueDate}</small>
+            </span>
+            <StatusBadge tone="preparing">Awaiting approval</StatusBadge>
+          </div>
+          <div className="queue-row">
+            <ShieldCheck size={18} />
+            <span>
+              <strong>Audit handoff prepared</strong>
+              <small>Task receives advisor decision ID before routing to execution.</small>
+            </span>
+            <StatusBadge tone="neutral">Policy gated</StatusBadge>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="primary-button" type="button" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

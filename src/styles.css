@@ -722,6 +722,12 @@ button:disabled {
   border-radius: 999px;
 }
 
+.mini-progress i.syncing {
+  background: linear-gradient(90deg, var(--amber), var(--blue));
+  background-size: 160% 100%;
+  animation: progressPulse 0.9s linear infinite;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -1923,6 +1929,13 @@ button:disabled {
   display: grid;
   gap: 7px;
   align-content: start;
+  min-width: 0;
+}
+
+.email-inline-copy strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .email-inline-copy small {
@@ -1933,7 +1946,7 @@ button:disabled {
 
 .email-preview {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(280px, 420px) minmax(300px, 1fr) auto;
   align-items: stretch;
 }
 
@@ -2051,6 +2064,7 @@ button:disabled {
 
 .demo-mode-banner,
 .all-clear-banner,
+.completion-summary-card,
 .empty-extraction {
   padding: 14px;
   border: 1px solid var(--line);
@@ -2075,6 +2089,32 @@ button:disabled {
   color: #14532d;
   background: #f0fdf4;
   border-color: #bbf7d0;
+}
+
+.completion-summary-card {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  color: var(--navy);
+  background: #f8fffb;
+  border-color: #bbf7d0;
+}
+
+.completion-summary-card > svg {
+  color: var(--green);
+}
+
+.completion-summary-card strong,
+.completion-summary-card p {
+  display: block;
+  margin: 0;
+}
+
+.completion-summary-card p {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .empty-extraction {
@@ -2385,7 +2425,9 @@ button:disabled {
 }
 
 .confirm-list,
-.reset-impact {
+.reset-impact,
+.audit-record-table,
+.queue-list {
   display: grid;
   gap: 8px;
   margin: 14px 0;
@@ -2430,6 +2472,66 @@ button:disabled {
 
 .reset-impact strong {
   color: var(--danger);
+}
+
+.audit-modal {
+  width: min(780px, 100%);
+}
+
+.audit-record-row,
+.queue-row {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.audit-record-row {
+  grid-template-columns: 82px 170px 1fr;
+  align-items: center;
+}
+
+.audit-record-row span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.audit-record-row strong,
+.audit-record-row p {
+  margin: 0;
+}
+
+.audit-record-row p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.queue-row {
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+}
+
+.queue-row.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.queue-row svg {
+  color: var(--blue);
+}
+
+.queue-row strong,
+.queue-row small {
+  display: block;
+}
+
+.queue-row small {
+  margin-top: 3px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .profile-hero {
@@ -2730,6 +2832,12 @@ button:disabled {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes progressPulse {
+  to {
+    background-position: -160% 0;
   }
 }
 
