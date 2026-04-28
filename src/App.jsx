@@ -139,6 +139,13 @@ const productivityData = [
   { week: "W4", saved: 10.4 }
 ];
 
+const timeSavedOverlayPoints = [
+  { week: "W1", saved: 6.5, left: "18%", top: "45%" },
+  { week: "W2", saved: 8.2, left: "43%", top: "32%" },
+  { week: "W3", saved: 9.1, left: "66%", top: "25%" },
+  { week: "W4", saved: 10.4, left: "88%", top: "15%" }
+];
+
 const cashFlowData = [
   { month: "Jan", portfolio: 27.6 },
   { month: "Feb", portfolio: 27.9 },
@@ -1825,6 +1832,23 @@ function Dashboard({
               />
             </AreaChart>
           </ResponsiveContainer>
+          <div className="time-saved-points" aria-label="Advisor time saved exact weekly values">
+            {timeSavedOverlayPoints.map((point) => (
+              <button
+                key={point.week}
+                className="time-saved-point"
+                type="button"
+                style={{ left: point.left, top: point.top }}
+                aria-label={`${point.week}: ${point.saved} hours saved`}
+              >
+                <span className="time-saved-dot" />
+                <span className="time-saved-hover" role="tooltip">
+                  <strong>{point.week}: {point.saved}h saved</strong>
+                  <small>Advisor time saved</small>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
         <div className="chart-note-row">
           <span><i /> Advisor hours saved per week</span>
