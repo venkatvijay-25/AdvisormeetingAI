@@ -38,7 +38,6 @@ import {
   Gauge,
   History,
   Info,
-  Layers3,
   ListChecks,
   LockKeyhole,
   Mail,
@@ -214,11 +213,232 @@ const initialActions = [
   }
 ];
 
+const scenarioConfigs = {
+  sterling: {
+    id: "sterling",
+    label: "Sterling Family",
+    notesLabel: "Scenario B",
+    audioFile: "sterling-review-audio.m4a",
+    meetingTime: "10:00 AM",
+    crmFieldLabel: "Risk Tolerance",
+    crmBefore: "Moderate",
+    crmAfter: "Conservative",
+    crmOptions: ["Conservative", "Moderate", "Growth"],
+    sampleNotes,
+    noteKeywords: ["sterling", "250,000", "stanford", "risk tolerance"],
+    taskDraft: defaultTaskDraft,
+    emailDraft: defaultEmailDraft,
+    emailEnvelope: defaultEmailEnvelope,
+    actions: initialActions
+  },
+  chen: {
+    id: "chen",
+    label: "Elaine Chen Trust",
+    notesLabel: "Scenario C",
+    audioFile: "chen-estate-liquidity.m4a",
+    meetingTime: "1:00 PM",
+    crmFieldLabel: "Planning Status",
+    crmBefore: "Standard Review",
+    crmAfter: "Estate Escalation",
+    crmOptions: ["Estate Escalation", "Liquidity Watch", "Standard Review"],
+    sampleNotes:
+      "Elaine Chen estate liquidity review completed at 1:42 PM. Elaine wants to model estate-tax liquidity under a compressed timeline because the trust owns several illiquid real estate partnerships. She asked the team to prepare a $1.2M liquidity ladder by May 10 and compare borrowing against the credit line versus staged partnership distributions. Update the planning status to Estate Escalation and send Elaine a concise summary of the liquidity options with next steps for her CPA.",
+    noteKeywords: ["chen", "estate", "1.2m", "liquidity ladder"],
+    taskDraft: {
+      assignee: "Priya Shah, CSA",
+      amount: "$1,200,000",
+      dueDate: "May 10, 2026"
+    },
+    emailDraft:
+      "Hi Elaine,\n\nThank you for reviewing the trust liquidity plan today. We will prepare the $1.2M liquidity ladder by May 10 and compare the credit-line option against staged partnership distributions. I will also coordinate the summary with your CPA so the estate-tax timing assumptions are clear.\n\nBest,\nSarah",
+    emailEnvelope: {
+      from: "Sarah Mitchell <sarah.mitchell@aequitas.demo>",
+      to: ["Elaine Chen <elaine.chen@example.com>"],
+      cc: ["Priya Shah, CSA <priya.shah@aequitas.demo>"],
+      bcc: [],
+      subject: "Chen trust liquidity review next steps",
+      signature: "Sarah Mitchell\nSenior Wealth Advisor\nAequitas Private Wealth"
+    },
+    actions: [
+      {
+        ...initialActions[0],
+        summary: "Update planning status to Estate Escalation",
+        confidence: 92,
+        confidenceRationale:
+          "Clear client request, named trust context, and estate-liquidity timing matched CRM planning status.",
+        evidence: "Meeting note: update Chen planning status to Estate Escalation",
+        status: "pending"
+      },
+      {
+        ...initialActions[1],
+        summary: "Prepare $1.2M liquidity ladder by May 10",
+        confidence: 90,
+        confidenceRationale:
+          "Amount, owner queue, due date, and analysis type were all detected in the note.",
+        evidence: "Meeting note: prepare a $1.2M liquidity ladder by May 10",
+        status: "pending"
+      },
+      {
+        ...initialActions[2],
+        summary: "Send trust liquidity options summary to Elaine",
+        confidence: 86,
+        confidenceRationale:
+          "Communication request is explicit, but CPA coordination remains advisor-confirmed.",
+        evidence: "Meeting note: send Elaine a concise summary of the liquidity options",
+        status: "pending"
+      }
+    ]
+  },
+  morrison: {
+    id: "morrison",
+    label: "Morrison Holdings LLC",
+    notesLabel: "Scenario D",
+    audioFile: "morrison-tax-planning.m4a",
+    meetingTime: "3:30 PM",
+    crmFieldLabel: "Review Theme",
+    crmBefore: "Standard Review",
+    crmAfter: "Tax Planning",
+    crmOptions: ["Tax Planning", "Charitable Review", "Standard Review"],
+    sampleNotes:
+      "Morrison Holdings tax planning call finished at 4:08 PM. The family office wants a charitable trust memo before the next CPA meeting and asked whether the appreciated private credit position can fund the strategy without disrupting cash reserves. Prepare a charitable trust memo by May 17, update the review theme to Tax Planning, and draft a short note summarizing the private credit funding trade-offs.",
+    noteKeywords: ["morrison", "charitable trust", "private credit", "tax planning"],
+    taskDraft: {
+      assignee: "Daniel Reed, CSA",
+      amount: "Charitable trust memo",
+      dueDate: "May 17, 2026"
+    },
+    emailDraft:
+      "Hi Morrison family office team,\n\nThank you for the tax planning discussion today. We will prepare the charitable trust memo by May 17 and include the private credit funding trade-offs, including the impact on cash reserves and implementation timing.\n\nBest,\nSarah",
+    emailEnvelope: {
+      from: "Sarah Mitchell <sarah.mitchell@aequitas.demo>",
+      to: ["Morrison Family Office <familyoffice@morrison.example.com>"],
+      cc: ["Daniel Reed, CSA <daniel.reed@aequitas.demo>"],
+      bcc: [],
+      subject: "Morrison tax planning follow-up",
+      signature: "Sarah Mitchell\nSenior Wealth Advisor\nAequitas Private Wealth"
+    },
+    actions: [
+      {
+        ...initialActions[0],
+        summary: "Update review theme to Tax Planning",
+        confidence: 91,
+        confidenceRationale:
+          "Review theme and tax planning context are both explicitly present in the meeting note.",
+        evidence: "Meeting note: update Morrison review theme to Tax Planning",
+        status: "pending"
+      },
+      {
+        ...initialActions[1],
+        summary: "Prepare charitable trust memo by May 17",
+        confidence: 89,
+        confidenceRationale:
+          "Deliverable, due date, and family office audience were detected in the same note segment.",
+        evidence: "Meeting note: prepare a charitable trust memo by May 17",
+        status: "pending"
+      },
+      {
+        ...initialActions[2],
+        summary: "Draft private credit funding trade-off note",
+        confidence: 84,
+        confidenceRationale:
+          "Follow-up request is clear, but funding recommendations still require advisor review.",
+        evidence: "Meeting note: summarize private credit funding trade-offs",
+        status: "pending"
+      }
+    ]
+  }
+};
+
+const meetingBriefs = {
+  sterling: {
+    headline: "Sterling Family",
+    eyebrow: "10:00 AM - Quarterly review",
+    description:
+      "AI brief assembled from CRM, portfolio accounting, calendar, task history, and document vault sources.",
+    facts: [
+      ["AUM", "$28.4M"],
+      ["Relationship since", "2018"],
+      ["Risk profile", "Moderate"],
+      ["Last contact", "Apr 18, 2026"]
+    ],
+    callouts: [
+      ["blue", "Recent life event", "Maya Sterling accepted to Stanford and starts in September."],
+      ["amber", "Outstanding task", "Confirm renovation payment schedule before trust transfer paperwork is opened."],
+      ["green", "Client preference", "Prefers concise email summaries with tax and liquidity impacts separated."]
+    ],
+    allocation: allocationData,
+    agenda: defaultAgenda,
+    sources: ["Salesforce FSC", "Calendar", "Task history", "Document vault"]
+  },
+  chen: {
+    headline: "Elaine Chen Trust",
+    eyebrow: "1:00 PM - Estate liquidity review",
+    description:
+      "AI brief prepared around estate-tax liquidity, illiquid partnership exposure, credit-line options, and CPA coordination.",
+    facts: [
+      ["AUM", "$14.8M"],
+      ["Relationship since", "2021"],
+      ["Planning status", "Estate review"],
+      ["Last contact", "Apr 22, 2026"]
+    ],
+    callouts: [
+      ["blue", "Planning pressure", "Estate-tax liquidity timing may compress after the partnership valuation update."],
+      ["amber", "Illiquid exposure", "Real estate partnership distributions may not match the payment timeline."],
+      ["green", "Client preference", "Prefers scenario tables before making credit-line decisions."]
+    ],
+    allocation: [
+      { name: "Public Equity", current: 31, target: 34 },
+      { name: "Fixed Income", current: 24, target: 28 },
+      { name: "Alternatives", current: 33, target: 26 },
+      { name: "Cash", current: 9, target: 8 },
+      { name: "Private Credit", current: 3, target: 4 }
+    ],
+    agenda: [
+      "Review estate-tax liquidity timeline and payment assumptions",
+      "Compare credit line draw versus staged partnership distributions",
+      "Confirm CPA coordination steps and decision owners",
+      "Assign liquidity ladder and follow-up summary"
+    ],
+    sources: ["Salesforce FSC", "Document vault", "Open tasks", "Portfolio alerts"]
+  },
+  morrison: {
+    headline: "Morrison Holdings LLC",
+    eyebrow: "3:30 PM - Tax planning call",
+    description:
+      "AI brief prepared around charitable trust strategy, appreciated private credit exposure, cash reserve tolerance, and CPA follow-up.",
+    facts: [
+      ["AUM", "$41.2M"],
+      ["Entity", "Family LLC"],
+      ["Review theme", "Tax planning"],
+      ["Last contact", "Apr 19, 2026"]
+    ],
+    callouts: [
+      ["blue", "Planning topic", "Charitable trust memo requested ahead of the next CPA meeting."],
+      ["amber", "Funding trade-off", "Appreciated private credit could fund the strategy but may reduce reserve flexibility."],
+      ["green", "Client preference", "Family office wants concise memo format with implementation timing."]
+    ],
+    allocation: [
+      { name: "Public Equity", current: 36, target: 35 },
+      { name: "Fixed Income", current: 18, target: 22 },
+      { name: "Alternatives", current: 22, target: 18 },
+      { name: "Cash", current: 7, target: 10 },
+      { name: "Private Credit", current: 17, target: 15 }
+    ],
+    agenda: [
+      "Review charitable trust memo scope and CPA timing",
+      "Discuss private credit funding trade-offs",
+      "Confirm cash reserve floor before implementation",
+      "Assign memo draft and family office follow-up"
+    ],
+    sources: ["Salesforce FSC", "IPS", "YTD tax lot report", "Document vault"]
+  }
+};
+
 const profileTabs = [
-  { label: "Overview", enabled: false },
-  { label: "Portfolio", enabled: false },
-  { label: "Documents", enabled: false },
-  { label: "Interactions", enabled: false },
+  { label: "Overview", enabled: true },
+  { label: "Portfolio", enabled: true },
+  { label: "Documents", enabled: true },
+  { label: "Interactions", enabled: true },
   { label: "AI Insights", enabled: true }
 ];
 const sessionStorageKey = "aequitas-ai-demo-session-v2";
@@ -478,15 +698,9 @@ function trapModalFocus(event) {
   }
 }
 
-function isSterlingScenarioInput(notes, audioSelected) {
+function isScenarioInput(notes, audioSelected, scenario) {
   const normalized = notes.toLowerCase();
-  return (
-    audioSelected ||
-    (normalized.includes("sterling") &&
-      (normalized.includes("250,000") ||
-        normalized.includes("risk tolerance") ||
-        normalized.includes("stanford")))
-  );
+  return audioSelected || scenario.noteKeywords.some((keyword) => normalized.includes(keyword));
 }
 
 function readStoredSession() {
@@ -527,6 +741,13 @@ function App() {
   const [activeProfileTab, setActiveProfileTab] = useState(
     initialSession.activeProfileTab || "AI Insights"
   );
+  const [activeMeetingId, setActiveMeetingId] = useState(initialSession.activeMeetingId || "sterling");
+  const [activeNotesMeetingId, setActiveNotesMeetingId] = useState(
+    initialSession.activeNotesMeetingId || "sterling"
+  );
+  const [executionMeetingId, setExecutionMeetingId] = useState(
+    initialSession.executionMeetingId || "sterling"
+  );
   const [agenda, setAgenda] = useState(initialSession.agenda || defaultAgenda);
   const [agendaAudit, setAgendaAudit] = useState(initialSession.agendaAudit || {});
   const [editingAgenda, setEditingAgenda] = useState(null);
@@ -562,6 +783,7 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [recentActivity, setRecentActivity] = useState(initialSession.recentActivity || activity);
+  const [syncRetries, setSyncRetries] = useState(initialSession.syncRetries || {});
 
   const completedCount = actions.filter((action) => action.status === "complete").length;
   const rejectedCount = actions.filter((action) => action.status === "rejected").length;
@@ -578,6 +800,9 @@ function App() {
     const nextSession = {
       view,
       activeProfileTab,
+      activeMeetingId,
+      activeNotesMeetingId,
+      executionMeetingId,
       agenda,
       agendaAudit,
       sections,
@@ -590,12 +815,16 @@ function App() {
       emailDraft,
       emailEnvelope,
       presentationReady,
-      recentActivity
+      recentActivity,
+      syncRetries
     };
     window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(nextSession));
   }, [
     view,
     activeProfileTab,
+    activeMeetingId,
+    activeNotesMeetingId,
+    executionMeetingId,
     agenda,
     agendaAudit,
     sections,
@@ -608,7 +837,8 @@ function App() {
     emailDraft,
     emailEnvelope,
     presentationReady,
-    recentActivity
+    recentActivity,
+    syncRetries
   ]);
 
   useEffect(() => {
@@ -649,6 +879,15 @@ function App() {
   function navigate(nextView, options = {}) {
     if (nextView === "profile") {
       setActiveProfileTab(options.tab || "AI Insights");
+      if (options.meetingId) {
+        setActiveMeetingId(options.meetingId);
+      }
+    }
+    if (nextView === "meeting" && options.meetingId) {
+      setActiveMeetingId(options.meetingId);
+    }
+    if (nextView === "notes" && options.meetingId) {
+      setActiveNotesMeetingId(options.meetingId);
     }
     setNotificationsOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -678,9 +917,19 @@ function App() {
     }, 2000);
   }
 
+  function handleRetrySync(meetingId) {
+    setSyncRetries((current) => ({ ...current, [meetingId]: "syncing" }));
+    setLiveMessage(`${meetingBriefs[meetingId]?.headline || "Brief"} source sync retry started.`);
+    window.setTimeout(() => {
+      setSyncRetries((current) => ({ ...current, [meetingId]: "queued" }));
+      showToast(`${meetingBriefs[meetingId]?.headline || "Brief"} source sync retry queued.`);
+    }, 900);
+  }
+
   function processNotes() {
     const trimmedNotes = notes.trim();
     const hasEnoughInput = trimmedNotes.length >= minimumNoteCharacters || audioSelected;
+    const selectedScenario = scenarioConfigs[activeNotesMeetingId] || scenarioConfigs.sterling;
     if (!hasEnoughInput) {
       setNotesError(
         `Add at least ${minimumNoteCharacters} characters of notes or select an audio file before processing.`
@@ -700,10 +949,15 @@ function App() {
       if (nextProgress >= 100) {
         window.clearInterval(timer);
         setProcessing(false);
-        if (isSterlingScenarioInput(trimmedNotes, audioSelected)) {
-          setActions(initialActions);
+        if (isScenarioInput(trimmedNotes, audioSelected, selectedScenario)) {
+          setActions(selectedScenario.actions);
           setExtractionMode("scripted");
-          setLiveMessage("AI extracted three Sterling Family actions for advisor review.");
+          setExecutionMeetingId(selectedScenario.id);
+          setRiskTolerance(selectedScenario.crmAfter);
+          setTaskDraft(selectedScenario.taskDraft);
+          setEmailDraft(selectedScenario.emailDraft);
+          setEmailEnvelope(selectedScenario.emailEnvelope);
+          setLiveMessage(`AI extracted three ${selectedScenario.label} actions for advisor review.`);
         } else {
           setActions([]);
           setExtractionMode("needs_review");
@@ -795,6 +1049,9 @@ function App() {
     window.sessionStorage.removeItem(sessionStorageKey);
     setView("dashboard");
     setActiveProfileTab("AI Insights");
+    setActiveMeetingId("sterling");
+    setActiveNotesMeetingId("sterling");
+    setExecutionMeetingId("sterling");
     setAgenda(defaultAgenda);
     setAgendaAudit({});
     setEditingAgenda(null);
@@ -825,6 +1082,7 @@ function App() {
     setNotificationsOpen(false);
     setResetConfirmOpen(false);
     setRecentActivity(activity);
+    setSyncRetries({});
     navigate("dashboard");
     showToast("Prototype reset for the next validation session.");
   }
@@ -854,10 +1112,13 @@ function App() {
             recentActivity={recentActivity}
             showToast={showToast}
             debugMode={debugMode}
+            syncRetries={syncRetries}
+            handleRetrySync={handleRetrySync}
           />
         )}
         {view === "meeting" && (
           <MeetingHub
+            activeMeetingId={activeMeetingId}
             agenda={agenda}
             setAgenda={setAgenda}
             agendaAudit={agendaAudit}
@@ -879,6 +1140,8 @@ function App() {
           <NotesInput
             notes={notes}
             setNotes={setNotes}
+            activeNotesMeetingId={activeNotesMeetingId}
+            setActiveNotesMeetingId={setActiveNotesMeetingId}
             audioSelected={audioSelected}
             setAudioSelected={setAudioSelected}
             processing={processing}
@@ -913,11 +1176,13 @@ function App() {
             pendingCount={pendingCount}
             batchApprovableActions={batchApprovableActions}
             extractionMode={extractionMode}
+            executionScenario={scenarioConfigs[executionMeetingId] || scenarioConfigs.sterling}
             onSourceOpen={setSourcePanel}
           />
         )}
         {view === "profile" && (
           <ClientProfile
+            activeMeetingId={activeMeetingId}
             activeTab={activeProfileTab}
             setActiveTab={setActiveProfileTab}
             navigate={navigate}
@@ -1114,6 +1379,7 @@ function Topbar({
           className="secondary-button approval-shortcut"
           type="button"
           title="Open Action Center"
+          aria-label={`Open Action Center, ${pendingCount} pending approvals`}
           onClick={() => navigate("actions")}
         >
           <ClipboardCheck size={16} />
@@ -1128,7 +1394,15 @@ function Topbar({
   );
 }
 
-function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMode }) {
+function Dashboard({
+  navigate,
+  onSourceOpen,
+  recentActivity,
+  showToast,
+  debugMode,
+  syncRetries,
+  handleRetrySync
+}) {
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
@@ -1170,7 +1444,16 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMod
           }
         />
         <div className="meeting-list">
-          {meetings.map((meeting) => (
+          {meetings.map((meeting) => {
+            const retryState = syncRetries[meeting.id];
+            const isRetrying = retryState === "syncing";
+            const prepNote =
+              retryState === "queued"
+                ? "Retry queued - next sync in 3 min"
+                : isRetrying
+                  ? "Retrying source sync..."
+                  : meeting.prepNote;
+            return (
             <article
               className="meeting-row"
               key={meeting.id}
@@ -1185,22 +1468,28 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMod
                 <span className="mini-progress" aria-label={`${meeting.prep}% brief readiness`}>
                   <i style={{ width: `${meeting.prep}%` }} />
                 </span>
-                <small>{meeting.prepNote}</small>
+                <small>{prepNote}</small>
                 {meeting.badge === "pending" && (
                   <button
                     className="text-button tiny"
                     type="button"
-                    onClick={() => showToast("Source sync retry queued for the pending brief.")}
+                    disabled={isRetrying}
+                    onClick={() => handleRetrySync(meeting.id)}
                   >
-                    Retry Sync
+                    {isRetrying ? "Retrying..." : "Retry Sync"}
                   </button>
                 )}
               </span>
-              <button className="secondary-button compact-row" type="button" onClick={() => navigate("meeting")}>
+              <button
+                className="secondary-button compact-row"
+                type="button"
+                onClick={() => navigate("meeting", { meetingId: meeting.id })}
+              >
                 Full Brief <ArrowRight size={15} />
               </button>
             </article>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -1327,24 +1616,34 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMod
         <SectionHeader icon={AlertTriangle} title="Portfolio Alerts" />
         <div className="alert-list">
           {alerts.map((alert) => (
-            <button
+            <article
               className={`alert-row ${alert.severity}`}
               key={alert.title}
-              type="button"
-              onClick={() => navigate("profile", { tab: "AI Insights" })}
             >
               <span>
                 <strong>{alert.title}</strong>
                 <small>{alert.client} · {alert.detail}</small>
               </span>
               <span className="impact-pill">{alert.impact}</span>
-            </button>
+              <div className="alert-actions">
+                <button className="secondary-button compact-row" type="button" onClick={() => navigate("profile", { tab: "AI Insights", meetingId: "sterling" })}>
+                  Review
+                </button>
+                <button className="text-button tiny" type="button" onClick={() => showToast(`${alert.title} added to the meeting agenda.`)}>
+                  Add to agenda
+                </button>
+              </div>
+            </article>
           ))}
         </div>
       </section>
 
       <section className="surface">
-          <SectionHeader icon={TrendingUp} title="Advisor Time Saved" />
+          <SectionHeader
+            icon={TrendingUp}
+            title="Advisor Time Saved"
+            action={<span className="counter">Unit: hours</span>}
+          />
         <div className="chart-medium">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={productivityData} margin={{ top: 8, right: 12, left: -24, bottom: 0 }}>
@@ -1356,17 +1655,21 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMod
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis dataKey="week" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} />
-              <Tooltip />
+              <YAxis tickLine={false} axisLine={false} label={{ value: "Hours", angle: -90, position: "insideLeft" }} />
+              <Tooltip formatter={(value) => [`${value} hours`, "Advisor time saved"]} />
               <Area
                 type="monotone"
                 dataKey="saved"
+                name="Advisor time saved"
                 stroke="#0f766e"
                 strokeWidth={3}
                 fill="url(#savedGradient)"
               />
             </AreaChart>
           </ResponsiveContainer>
+        </div>
+        <div className="chart-note-row">
+          <span><i /> Advisor hours saved per week</span>
         </div>
         <p className="methodology-note">
           Baseline: pre-Aequitas advisor self-reported average, March 2026 validation cohort
@@ -1427,6 +1730,7 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMod
 }
 
 function MeetingHub({
+  activeMeetingId,
   agenda,
   setAgenda,
   agendaAudit,
@@ -1443,16 +1747,16 @@ function MeetingHub({
   navigate,
   onSourceOpen
 }) {
+  const brief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
+  const agendaItems = activeMeetingId === "sterling" ? agenda : brief.agenda;
+
   return (
     <div className="page-grid meeting-grid">
       <section className="summary-band meeting-summary">
         <div>
-          <p className="eyebrow">10:00 AM · Quarterly review</p>
-          <h2>Sterling Family</h2>
-          <p>
-            AI brief assembled from CRM, portfolio accounting, calendar, task history, and document
-            vault sources.
-          </p>
+          <p className="eyebrow">{brief.eyebrow}</p>
+          <h2>{brief.headline}</h2>
+          <p>{brief.description}</p>
         </div>
         <div className="button-row">
           <button className="secondary-button" type="button" onClick={() => navigate("profile")}>
@@ -1475,30 +1779,17 @@ function MeetingHub({
           setSections={setSections}
         >
           <div className="snapshot-grid">
-            <InsightFact label="AUM" value="$28.4M" />
-            <InsightFact label="Relationship since" value="2018" />
-            <InsightFact label="Risk profile" value="Moderate" />
-            <InsightFact label="Last contact" value="Apr 18, 2026" />
+            {brief.facts.map(([label, value]) => (
+              <InsightFact key={label} label={label} value={value} />
+            ))}
           </div>
           <div className="callout-list">
-            <TrustCallout
-              tone="blue"
-              title="Recent life event"
-              text="Maya Sterling accepted to Stanford and starts in September."
-            />
-            <TrustCallout
-              tone="amber"
-              title="Outstanding task"
-              text="Confirm renovation payment schedule before trust transfer paperwork is opened."
-            />
-            <TrustCallout
-              tone="green"
-              title="Client preference"
-              text="Prefers concise email summaries with tax and liquidity impacts separated."
-            />
+            {brief.callouts.map(([tone, title, text]) => (
+              <TrustCallout key={title} tone={tone} title={title} text={text} />
+            ))}
           </div>
           <EvidenceStrip
-            sources={["Salesforce FSC", "Calendar", "Task history", "Document vault"]}
+            sources={brief.sources}
             onSourceOpen={onSourceOpen}
           />
         </BriefSection>
@@ -1518,9 +1809,18 @@ function MeetingHub({
               </div>
               <div className="chart-large">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={allocationData} margin={{ top: 12, right: 20, left: -16, bottom: 0 }}>
+                  <BarChart data={brief.allocation} margin={{ top: 12, right: 20, left: -16, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                    <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      interval={0}
+                      angle={-18}
+                      textAnchor="end"
+                      height={58}
+                      tick={{ fontSize: 11 }}
+                    />
                     <YAxis tickLine={false} axisLine={false} />
                     <Tooltip />
                     <Bar dataKey="current" fill="#2563eb" radius={[5, 5, 0, 0]} name="Current" />
@@ -1528,7 +1828,7 @@ function MeetingHub({
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <AllocationComparison />
+              <AllocationComparison data={brief.allocation} />
             </div>
             <div className="callout-list">
               <TrustCallout
@@ -1557,7 +1857,7 @@ function MeetingHub({
           setSections={setSections}
         >
           <div className="agenda-list">
-            {agenda.map((item, index) => (
+            {agendaItems.map((item, index) => (
               <div className="agenda-item" key={`${item}-${index}`}>
                 <span className="agenda-number">{index + 1}</span>
                 {editingAgenda === index ? (
@@ -1588,7 +1888,7 @@ function MeetingHub({
                         className="primary-button compact-row"
                         type="button"
                         onClick={() => {
-                          const nextAgenda = [...agenda];
+                          const nextAgenda = [...agendaItems];
                           nextAgenda[index] = editingAgendaDraft;
                           setAgenda(nextAgenda);
                           setAgendaAudit((current) => ({
@@ -1609,10 +1909,10 @@ function MeetingHub({
                     {agendaAudit[index] && <span className="edited-chip">{agendaAudit[index]}</span>}
                   </p>
                 )}
-                <button
-                  className="secondary-button compact-row"
-                  type="button"
-                  title="Edit agenda item"
+              <button
+                className="secondary-button compact-row"
+                type="button"
+                title="Edit agenda item"
                   onClick={() => {
                     setEditingAgenda(index);
                     setEditingAgendaDraft(item);
@@ -1634,23 +1934,13 @@ function MeetingHub({
       <aside className="side-column">
         <section className="surface profile-snapshot">
           <SectionHeader icon={BadgeCheck} title="Client Snapshot" />
-          <div className="profile-stat">
-            <span>AUM</span>
-            <strong>$28.4M</strong>
-          </div>
-          <div className="profile-stat">
-            <span>Household</span>
-            <strong>Robert & Anne Sterling</strong>
-          </div>
-          <div className="profile-stat">
-            <span>Risk profile</span>
-            <strong>Moderate</strong>
-          </div>
-          <div className="profile-stat">
-            <span>Relationship</span>
-            <strong>8 years</strong>
-          </div>
-          <button className="secondary-button full" type="button" onClick={() => navigate("profile")}>
+          {brief.facts.slice(0, 4).map(([label, value]) => (
+            <div className="profile-stat" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+          <button className="secondary-button full" type="button" onClick={() => navigate("profile", { meetingId: activeMeetingId })}>
             <Eye size={16} />
             View Full Profile
           </button>
@@ -1705,6 +1995,8 @@ function BriefSection({ id, icon: Icon, title, open, setSections, children }) {
 function NotesInput({
   notes,
   setNotes,
+  activeNotesMeetingId,
+  setActiveNotesMeetingId,
   audioSelected,
   setAudioSelected,
   processing,
@@ -1714,16 +2006,39 @@ function NotesInput({
   setNotesError
 }) {
   const hasEnoughInput = notes.trim().length >= minimumNoteCharacters || audioSelected;
+  const selectedScenario = scenarioConfigs[activeNotesMeetingId] || scenarioConfigs.sterling;
 
   return (
     <div className="page-grid notes-grid">
       <section className="summary-band">
         <div>
-          <p className="eyebrow">Scenario B · Sterling Family</p>
+          <p className="eyebrow">{selectedScenario.notesLabel} - {selectedScenario.label}</p>
           <h2>Convert meeting outcomes into advisor-approved actions</h2>
           <p>No external communication, CRM update, or task creation occurs without approval.</p>
         </div>
         <Metric label="Expected review time" value="90s" icon={Clock3} />
+      </section>
+
+      <section className="surface notes-surface">
+        <SectionHeader icon={Users} title="Meeting Scenario" />
+        <div className="scenario-switcher" role="list">
+          {Object.values(scenarioConfigs).map((scenario) => (
+            <button
+              key={scenario.id}
+              className={activeNotesMeetingId === scenario.id ? "active" : ""}
+              type="button"
+              onClick={() => {
+                setActiveNotesMeetingId(scenario.id);
+                setAudioSelected(false);
+                setNotes("");
+                setNotesError("");
+              }}
+            >
+              <strong>{scenario.label}</strong>
+              <small>{scenario.meetingTime} - {scenario.notesLabel}</small>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="surface notes-surface">
@@ -1737,7 +2052,7 @@ function NotesInput({
           }}
         >
           <UploadCloud size={28} />
-          <span>{audioSelected ? "sterling-review-audio.m4a selected" : "MP3, M4A, or WAV"}</span>
+          <span>{audioSelected ? `${selectedScenario.audioFile} selected` : "MP3, M4A, or WAV"}</span>
           <small>{audioSelected ? "Ready for simulated analysis" : "Drag-and-drop zone"}</small>
         </button>
       </section>
@@ -1746,13 +2061,27 @@ function NotesInput({
         <SectionHeader
           icon={PenLine}
           title="Paste Meeting Notes"
-          action={<span className="counter">{notes.length.toLocaleString()} characters</span>}
+          action={
+            <div className="button-row">
+              <span className="counter">{notes.length.toLocaleString()} characters</span>
+              <button
+                className="text-button tiny"
+                type="button"
+                onClick={() => {
+                  setNotes(selectedScenario.sampleNotes);
+                  setNotesError("");
+                }}
+              >
+                Load sample notes
+              </button>
+            </div>
+          }
         />
         <textarea
           value={notes}
           onFocus={() => {
             if (!notes) {
-              setNotes(sampleNotes);
+              setNotes(selectedScenario.sampleNotes);
               setNotesError("");
             }
           }}
@@ -1846,6 +2175,7 @@ function ActionCenter({
   pendingCount,
   batchApprovableActions,
   extractionMode,
+  executionScenario,
   onSourceOpen
 }) {
   const hasActions = actions.length > 0;
@@ -1858,7 +2188,7 @@ function ActionCenter({
     <div className="page-grid actions-grid">
       <section className="summary-band">
         <div>
-          <p className="eyebrow">Post-meeting execution · Sterling Family</p>
+          <p className="eyebrow">Post-meeting execution - {executionScenario.label}</p>
           <h2>
             {hasActions
               ? `AI has drafted ${actions.length} actions from your meeting notes`
@@ -1867,7 +2197,7 @@ function ActionCenter({
           <p>
             {hasActions
               ? "Review source evidence, make edits, approve, reject, or request changes."
-              : "The supplied notes did not match the scripted Sterling scenario strongly enough to create confident actions."}
+              : `The supplied notes did not match the scripted ${executionScenario.label} scenario strongly enough to create confident actions.`}
           </p>
         </div>
         <div className="button-row">
@@ -1919,17 +2249,17 @@ function ActionCenter({
                 onSourceOpen={onSourceOpen}
               >
                 <div className="field-row">
-                  <span>Risk Tolerance</span>
+                  <span>{executionScenario.crmFieldLabel}</span>
                   <select
                     value={riskTolerance}
                     onChange={(event) => setRiskTolerance(event.target.value)}
                   >
-                    <option>Conservative</option>
-                    <option>Moderate</option>
-                    <option>Growth</option>
+                    {executionScenario.crmOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
                   </select>
                 </div>
-                <DiffLine before="Moderate" after={riskTolerance} />
+                <DiffLine before={executionScenario.crmBefore} after={riskTolerance} />
               </ActionCard>
             );
           }
@@ -1988,9 +2318,14 @@ function ActionCenter({
             >
               <div className="email-preview">
                 <EmailEnvelopePreview envelope={emailEnvelope} compact />
-                <p>{emailDraft.split("\n").filter(Boolean).slice(0, 2).join(" ")}</p>
-                <button className="text-button" type="button" onClick={() => setEmailModalOpen(true)}>
-                  View Full Draft <ArrowRight size={15} />
+                <div className="email-inline-copy">
+                  <StatusBadge tone="neutral">Editable draft</StatusBadge>
+                  <p>{emailDraft.split("\n").filter(Boolean).slice(0, 2).join(" ")}</p>
+                  <small>Full envelope, body, subject, signature, and send confirmation open in the draft review modal.</small>
+                </div>
+                <button className="secondary-button compact-row" type="button" onClick={() => setEmailModalOpen(true)}>
+                  <Eye size={15} />
+                  Review Draft
                 </button>
               </div>
             </ActionCard>
@@ -2356,22 +2691,26 @@ function DeckPreviewModal({ onClose, onToast }) {
     {
       title: "Sterling Family Brief",
       kicker: "Quarterly Review",
-      body: "Client context, recent life events, outstanding tasks, and advisor-ready talking points."
+      body: "Client context, recent life events, outstanding tasks, and advisor-ready talking points.",
+      type: "brief"
     },
     {
       title: "Suggested Agenda",
       kicker: "Advisor editable",
-      body: "Liquidity needs, risk posture hypothesis, tax-loss harvesting, and trust transfer next steps."
+      body: "Liquidity needs, risk posture hypothesis, tax-loss harvesting, and trust transfer next steps.",
+      type: "agenda"
     },
     {
       title: "Current vs Target Allocation",
       kicker: "Portfolio review",
-      body: "Public equity is above target; fixed income is below target; rebalance discussion recommended."
+      body: "Public equity is above target; fixed income is below target; rebalance discussion recommended.",
+      type: "allocation"
     },
     {
       title: "Drift and Opportunity",
       kicker: "AI alerts",
-      body: "$42K tax-loss harvesting opportunity and +6.8% equity drift flagged for review."
+      body: "$42K tax-loss harvesting opportunity and +6.8% equity drift flagged for review.",
+      type: "alerts"
     }
   ];
 
@@ -2393,6 +2732,7 @@ function DeckPreviewModal({ onClose, onToast }) {
               <span>{String(index + 1).padStart(2, "0")}</span>
               <p>{slide.kicker}</p>
               <h4>{slide.title}</h4>
+              <DeckSlideMock type={slide.type} />
               <small>{slide.body}</small>
             </article>
           ))}
@@ -2408,6 +2748,47 @@ function DeckPreviewModal({ onClose, onToast }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DeckSlideMock({ type }) {
+  if (type === "agenda") {
+    return (
+      <div className="deck-slide-mock agenda">
+        <span>01 Liquidity needs</span>
+        <span>02 Risk posture</span>
+        <span>03 Tax-loss opportunity</span>
+      </div>
+    );
+  }
+
+  if (type === "allocation") {
+    return (
+      <div className="deck-slide-mock allocation">
+        {allocationData.slice(0, 4).map((item) => (
+          <i key={item.name} style={{ height: `${Math.max(item.current, 12)}%` }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "alerts") {
+    return (
+      <div className="deck-slide-mock alerts">
+        <strong>$42K</strong>
+        <span>Tax-loss offset</span>
+        <strong>+6.8%</strong>
+        <span>Equity drift</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="deck-slide-mock brief">
+      <strong>Sterling Family</strong>
+      <span>AUM $28.4M</span>
+      <span>Risk hypothesis: conservative shift</span>
     </div>
   );
 }
@@ -2630,17 +3011,17 @@ function PortfolioSparkline() {
   );
 }
 
-function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
+function ClientProfile({ activeMeetingId, activeTab, setActiveTab, navigate, showToast }) {
+  const brief = meetingBriefs[activeMeetingId] || meetingBriefs.sterling;
+  const aum = brief.facts.find(([label]) => label === "AUM")?.[1] || "$28.4M";
+
   return (
     <div className="page-grid profile-grid">
       <section className="summary-band profile-hero">
         <div>
-          <p className="eyebrow">Client since 2018 · $28.4M AUM</p>
-          <h2>Sterling Family</h2>
-          <p>
-            Multi-generational household with liquidity planning, concentrated tax events, trust
-            administration, and education funding milestones.
-          </p>
+          <p className="eyebrow">{brief.eyebrow} - {aum} AUM</p>
+          <h2>{brief.headline}</h2>
+          <p>{brief.description}</p>
         </div>
         <div className="chart-small">
           <PortfolioSparkline />
@@ -2654,8 +3035,6 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
               key={tab.label}
               className={`${activeTab === tab.label ? "active" : ""} ${!tab.enabled ? "disabled" : ""}`}
               type="button"
-              disabled={!tab.enabled}
-              title={tab.enabled ? "" : "Coming in production"}
               onClick={() => {
                 if (tab.enabled) setActiveTab(tab.label);
               }}
@@ -2665,74 +3044,183 @@ function ClientProfile({ activeTab, setActiveTab, navigate, showToast }) {
           ))}
         </div>
 
-        {activeTab === "AI Insights" ? (
-          <div className="insights-layout">
-            <section className="insight-summary">
-              <div className="badge-row">
-                <StatusBadge tone="ready">AI Generated</StatusBadge>
-                <StatusBadge tone="neutral">Updated 8:44 AM</StatusBadge>
-              </div>
-              <p>
-                Sterling Family is entering a more conservative planning phase after Anne's
-                dental practice sale and Maya's Stanford acceptance. Liquidity needs are near-term,
-                while portfolio drift and tax-loss harvesting create an opportunity to rebalance
-                without disrupting the family's income target.
-              </p>
-            </section>
-
-            <section className="timeline">
-              <h3>Key Life Events</h3>
-              <TimelineItem date="Apr 2026" title="Maya accepted to Stanford" />
-              <TimelineItem date="Mar 2026" title="Dental practice sale completed" />
-              <TimelineItem date="Nov 2025" title="Trust distribution policy updated" />
-            </section>
-
-            <section className="profile-alerts">
-              <h3>Proactive AI Alerts</h3>
-              <div className="callout-list">
-                <TrustCallout
-                  tone="green"
-                  title="Tax-loss harvesting opportunity"
-                  text="$42K estimated offset available in municipal bond sleeve."
-                  action={
-                    <button className="secondary-button" type="button" onClick={() => navigate("actions")}>
-                      <Check size={16} />
-                      Take Action
-                    </button>
-                  }
-                />
-                <TrustCallout
-                  tone="amber"
-                  title="Allocation drift risk"
-                  text="Public equity has moved outside the IPS tolerance band."
-                  action={
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => showToast("Detailed analysis marked for future integration.")}
-                    >
-                      <BarChart3 size={16} />
-                      View Analysis
-                    </button>
-                  }
-                />
-              </div>
-            </section>
-
-            <section className="upcoming">
-              <h3>Upcoming Milestones</h3>
-              <Milestone date="May 3" title="Trust transfer target date" />
-              <Milestone date="Sep 14" title="Stanford tuition funding review" />
-            </section>
-          </div>
-        ) : (
-          <div className="coming-soon">
-            <Layers3 size={34} />
-            <h3>{activeTab} workspace</h3>
-            <p>Reserved for the production workflow after validation.</p>
-          </div>
-        )}
+        <ProfileTabContent activeTab={activeTab} brief={brief} navigate={navigate} showToast={showToast} />
       </section>
+    </div>
+  );
+}
+
+function ProfileTabContent({ activeTab, brief, navigate, showToast }) {
+  if (activeTab === "Overview") {
+    return (
+      <div className="profile-tab-panel">
+        <section className="profile-summary-card">
+          <h3>Household Overview</h3>
+          <p>{brief.description}</p>
+          <div className="snapshot-grid">
+            {brief.facts.map(([label, value]) => (
+              <InsightFact key={label} label={label} value={value} />
+            ))}
+          </div>
+        </section>
+        <section className="profile-summary-card">
+          <h3>Relationship Map</h3>
+          <div className="relationship-grid">
+            <TrustLine icon={Users} label="Household" value="Robert & Anne Sterling" />
+            <TrustLine icon={BriefcaseBusiness} label="CSA" value="Daniel Reed" />
+            <TrustLine icon={FileText} label="CPA" value="Coordinated by advisor" />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (activeTab === "Portfolio") {
+    return (
+      <div className="profile-tab-panel">
+        <section className="profile-summary-card">
+          <h3>Portfolio Snapshot</h3>
+          <AllocationComparison data={brief.allocation} />
+        </section>
+        <section className="profile-summary-card">
+          <h3>Allocation Notes</h3>
+          <div className="callout-list">
+            <TrustCallout
+              tone="amber"
+              title="Public equity drift"
+              text="Current public equity is 44%, above the 38% target and outside the tolerance band."
+            />
+            <TrustCallout
+              tone="green"
+              title="Tax-loss harvesting"
+              text="$42K estimated offset is available in the municipal bond sleeve."
+            />
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (activeTab === "Documents") {
+    return (
+      <div className="profile-tab-panel">
+        <section className="profile-summary-card">
+          <h3>Document Vault</h3>
+          <div className="document-list">
+            <DocumentRow title="Sterling Family Trust Agreement" type="Trust" date="Apr 20, 2026" />
+            <DocumentRow title="Investment Policy Statement" type="IPS" date="Nov 14, 2025" />
+            <DocumentRow title="Stanford Housing Estimate" type="Education" date="Apr 24, 2026" />
+          </div>
+        </section>
+        <section className="profile-summary-card">
+          <h3>Evidence Readiness</h3>
+          <p>All documents shown here are fictional validation records tied to the evidence drawer.</p>
+          <button className="secondary-button" type="button" onClick={() => showToast("Document export is mocked for the validation build.")}>
+            <Download size={16} />
+            Export document list
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  if (activeTab === "Interactions") {
+    return (
+      <div className="profile-tab-panel">
+        <section className="profile-summary-card">
+          <h3>Recent Interactions</h3>
+          <TimelineItem date="Apr 27" title="Quarterly review completed" />
+          <TimelineItem date="Apr 18" title="Prior call flagged lower-volatility discussion" />
+          <TimelineItem date="Mar 12" title="Trust distribution task completed" />
+        </section>
+        <section className="profile-summary-card">
+          <h3>Next Best Actions</h3>
+          <div className="button-row">
+            <button className="primary-button" type="button" onClick={() => navigate("actions")}>
+              <ClipboardCheck size={16} />
+              Review actions
+            </button>
+            <button className="secondary-button" type="button" onClick={() => navigate("notes")}>
+              <Mic2 size={16} />
+              Notes Workspace
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="insights-layout">
+      <section className="insight-summary">
+        <div className="badge-row">
+          <StatusBadge tone="ready">AI Generated</StatusBadge>
+          <StatusBadge tone="neutral">Updated 8:44 AM</StatusBadge>
+        </div>
+        <p>
+          {brief.headline} has an AI-prepared briefing package that connects client context,
+          portfolio evidence, source records, and advisor-approved follow-up actions. The
+          recommended next steps remain gated behind explicit advisor review.
+        </p>
+      </section>
+
+      <section className="timeline">
+        <h3>Key Life Events</h3>
+        <TimelineItem date="Apr 2026" title="Maya accepted to Stanford" />
+        <TimelineItem date="Mar 2026" title="Dental practice sale completed" />
+        <TimelineItem date="Nov 2025" title="Trust distribution policy updated" />
+      </section>
+
+      <section className="profile-alerts">
+        <h3>Proactive AI Alerts</h3>
+        <div className="callout-list">
+          <TrustCallout
+            tone="green"
+            title="Tax-loss harvesting opportunity"
+            text="$42K estimated offset available in municipal bond sleeve."
+            action={
+              <button className="secondary-button" type="button" onClick={() => navigate("actions")}>
+                <Check size={16} />
+                Take Action
+              </button>
+            }
+          />
+          <TrustCallout
+            tone="amber"
+            title="Allocation drift risk"
+            text="Public equity has moved outside the IPS tolerance band."
+            action={
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => showToast("Detailed analysis marked for future integration.")}
+              >
+                <BarChart3 size={16} />
+                View Analysis
+              </button>
+            }
+          />
+        </div>
+      </section>
+
+      <section className="upcoming">
+        <h3>Upcoming Milestones</h3>
+        <Milestone date="May 3" title="Trust transfer target date" />
+        <Milestone date="Sep 14" title="Stanford tuition funding review" />
+      </section>
+    </div>
+  );
+}
+
+function DocumentRow({ title, type, date }) {
+  return (
+    <div className="document-row">
+      <FileText size={16} />
+      <span>
+        <strong>{title}</strong>
+        <small>{type} - Updated {date}</small>
+      </span>
+      <StatusBadge tone="ready">Synced</StatusBadge>
     </div>
   );
 }
@@ -2853,14 +3341,14 @@ function PreviewBlock({ tone, label, title, text, source }) {
   );
 }
 
-function AllocationComparison({ compact = false }) {
+function AllocationComparison({ compact = false, data = allocationData }) {
   return (
     <div className={`allocation-bars ${compact ? "compact" : ""}`}>
       <div className="bar-legend" aria-label="Current versus target allocation legend">
         <span><i className="current" /> Current allocation bar</span>
         <span><i className="target" /> Target marker</span>
       </div>
-      {allocationData.map((item) => (
+      {data.map((item) => (
         <div className="allocation-bar-row" key={item.name}>
           <div className="allocation-bar-label">
             <strong>{item.name}</strong>
