@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -313,6 +313,152 @@ const sourceRecords = {
     ]
   }
 };
+
+const sourceRecordDetails = {
+  "Salesforce FSC": {
+    owner: "Sarah Mitchell",
+    timestamp: "Apr 18, 2026, 2:14 PM",
+    excerpt: "Prior call note: Robert and Anne asked to revisit volatility after the practice sale.",
+    highlight: "revisit volatility",
+    link: "salesforce://households/sterling-family",
+    schema: ["householdId", "crmField", "previousValue", "sourceNoteId", "lastUpdatedBy"]
+  },
+  Orion: {
+    owner: "Orion nightly sync",
+    timestamp: "Apr 26, 2026, 9:03 PM",
+    excerpt: "Sterling consolidated allocation: public equity 44.8% versus policy target 38.0%.",
+    highlight: "public equity 44.8%",
+    link: "orion://accounts/sterling/allocation",
+    schema: ["householdId", "assetClass", "currentWeight", "targetWeight", "driftBand"]
+  },
+  "Task history": {
+    owner: "Daniel Reed, CSA",
+    timestamp: "Apr 26, 2026, 4:32 PM",
+    excerpt: "Open service history shows prior trust distribution completed and renovation invoice timing pending.",
+    highlight: "renovation invoice timing pending",
+    link: "tasks://sterling-family/history",
+    schema: ["taskId", "assignee", "status", "dueDate", "auditEvents"]
+  },
+  "Tax lot report": {
+    owner: "Portfolio operations",
+    timestamp: "Apr 25, 2026, 6:10 PM",
+    excerpt: "Municipal bond sleeve includes harvestable losses while preserving income target through swap candidates.",
+    highlight: "harvestable losses",
+    link: "taxlots://sterling/muni-sleeve",
+    schema: ["lotId", "unrealizedGainLoss", "washSaleFlag", "replacementCusip", "taxYear"]
+  },
+  "Document vault": {
+    owner: "Document vault sync",
+    timestamp: "Apr 20, 2026, 11:25 AM",
+    excerpt: "Sterling family trust agreement and Stanford housing estimate are both available for briefing evidence.",
+    highlight: "Stanford housing estimate",
+    link: "vault://sterling-family/documents",
+    schema: ["documentId", "documentType", "effectiveDate", "accessPolicy", "sourceHash"]
+  },
+  "CRM notes": {
+    owner: "Sarah Mitchell",
+    timestamp: "Apr 18, 2026, 2:14 PM",
+    excerpt: "Advisor note records lower-volatility discussion and the upcoming Stanford planning milestone.",
+    highlight: "lower-volatility discussion",
+    link: "salesforce://interactions/sterling-apr-18",
+    schema: ["interactionId", "noteAuthor", "noteTimestamp", "excerpt", "linkedHousehold"]
+  },
+  "Portfolio alerts": {
+    owner: "Aequitas AI alert engine",
+    timestamp: "Apr 27, 2026, 7:05 AM",
+    excerpt: "Two alerts promoted for advisor review: tax-loss opportunity and allocation drift.",
+    highlight: "allocation drift",
+    link: "aequitas://alerts/sterling-family",
+    schema: ["alertId", "severity", "sourceSystem", "detectedAt", "advisorDisposition"]
+  },
+  "Open tasks": {
+    owner: "Daniel Reed, CSA",
+    timestamp: "Apr 27, 2026, 8:40 AM",
+    excerpt: "Client Service Associate intake queue for operational execution and audit follow-up.",
+    highlight: "Client Service Associate intake queue",
+    link: "tasks://csa-queue/sterling-family",
+    schema: ["queueId", "assignee", "client", "taskType", "approvalRecordId"]
+  },
+  "Advisor approval required": {
+    owner: "Compliance policy",
+    timestamp: "Always on",
+    excerpt: "Human approval is required before email send, CRM write-back, or task creation.",
+    highlight: "Human approval is required",
+    link: "policy://approval-controls/hitl",
+    schema: ["policyId", "actionType", "requiredRole", "decisionReason", "auditRecordId"]
+  },
+  "Audit record AEQ-0427-1000": {
+    owner: "Aequitas audit ledger",
+    timestamp: "Apr 27, 2026, 10:00 AM",
+    excerpt: "Brief generation, source reads, advisor edits, and approval decisions are retained in an immutable event log.",
+    highlight: "immutable event log",
+    link: "audit://records/AEQ-0427-1000",
+    schema: ["auditRecordId", "eventType", "actorId", "sourceHash", "decisionPayload"]
+  },
+  "Meeting note: reduce overall portfolio risk": {
+    owner: "Sarah Mitchell",
+    timestamp: "Apr 27, 2026, 10:52 AM",
+    excerpt: "Robert and Anne want to reduce overall portfolio risk after the sale of Anne's dental practice.",
+    highlight: "reduce overall portfolio risk",
+    link: "notes://meeting/AEQ-0427-1000#risk",
+    schema: ["noteId", "speaker", "sentenceOffset", "extractedField", "confidenceInputs"]
+  },
+  "Meeting note: move roughly $250,000 by May 3": {
+    owner: "Sarah Mitchell",
+    timestamp: "Apr 27, 2026, 10:52 AM",
+    excerpt: "Robert asked whether we can move roughly $250,000 from the family trust by May 3.",
+    highlight: "$250,000",
+    link: "notes://meeting/AEQ-0427-1000#transfer",
+    schema: ["noteId", "amount", "dueDate", "sourceAccount", "requestedOwner"]
+  },
+  "Meeting note: short written summary of the tax-loss harvesting opportunity": {
+    owner: "Sarah Mitchell",
+    timestamp: "Apr 27, 2026, 10:52 AM",
+    excerpt: "They want a short written summary of the tax-loss harvesting opportunity in the municipal bond sleeve.",
+    highlight: "short written summary",
+    link: "notes://meeting/AEQ-0427-1000#email",
+    schema: ["noteId", "requestedCommunication", "topic", "recipientSet", "sendApprovalId"]
+  }
+};
+
+function buildSourceRecord(source) {
+  const base = sourceRecords[source] || {
+    system: source.startsWith("Meeting note") ? "Meeting notes" : "Evidence source",
+    record: source,
+    updated: "Current validation session",
+    details: ["This evidence item is tied to the current scripted validation scenario."]
+  };
+  const detail = sourceRecordDetails[source] || {};
+
+  return {
+    owner: detail.owner || "Aequitas validation data",
+    timestamp: detail.timestamp || base.updated,
+    excerpt:
+      detail.excerpt ||
+      base.details?.[0] ||
+      "Structured source data will be mapped during production integration.",
+    highlight: detail.highlight || "",
+    link: detail.link || "mock://source-record",
+    schema:
+      detail.schema || ["sourceSystem", "recordId", "timestamp", "owner", "evidenceExcerpt"],
+    ...base
+  };
+}
+
+function renderHighlightedExcerpt(excerpt, highlight) {
+  if (!highlight) return excerpt;
+  const index = excerpt.indexOf(highlight);
+  if (index === -1) return excerpt;
+  const before = excerpt.slice(0, index);
+  const after = excerpt.slice(index + highlight.length);
+  return (
+    <>
+      {before}
+      <mark>{highlight}</mark>
+      {after}
+    </>
+  );
+}
 const focusableModalSelector =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -370,8 +516,14 @@ function serializeActions(actions) {
 
 function App() {
   const [initialSession] = useState(readStoredSession);
+  const toastTimerRef = useRef(null);
   const [view, setView] = useState(initialSession.view || "dashboard");
   const [toast, setToast] = useState("");
+  const [liveMessage, setLiveMessage] = useState("");
+  const [debugMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("debug") === "1";
+  });
   const [activeProfileTab, setActiveProfileTab] = useState(
     initialSession.activeProfileTab || "AI Insights"
   );
@@ -399,6 +551,8 @@ function App() {
     initialSession.emailEnvelope || defaultEmailEnvelope
   );
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailSendConfirmOpen, setEmailSendConfirmOpen] = useState(false);
+  const [approveAllConfirmOpen, setApproveAllConfirmOpen] = useState(false);
   const [reviewModal, setReviewModal] = useState(null);
   const [sourcePanel, setSourcePanel] = useState(null);
   const [deckModalOpen, setDeckModalOpen] = useState(false);
@@ -412,9 +566,13 @@ function App() {
   const completedCount = actions.filter((action) => action.status === "complete").length;
   const rejectedCount = actions.filter((action) => action.status === "rejected").length;
   const changesCount = actions.filter((action) => action.status === "changes").length;
+  const draftCount = actions.filter((action) => action.status === "draft").length;
   const pendingCount = actions.filter((action) =>
     ["pending", "draft", "approving"].includes(action.status)
   ).length;
+  const batchApprovableActions = actions.filter(
+    (action) => action.id !== "email" && ["pending", "draft"].includes(action.status)
+  );
 
   useEffect(() => {
     const nextSession = {
@@ -453,17 +611,57 @@ function App() {
     recentActivity
   ]);
 
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    function closeOnOutsideClick(event) {
+      if (!(event.target instanceof Element)) return;
+      const insidePanel = event.target.closest(".notifications-panel");
+      const trigger = event.target.closest(".notification-trigger");
+      if (!insidePanel && !trigger) {
+        setNotificationsOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        setNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [notificationsOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   function navigate(nextView, options = {}) {
     if (nextView === "profile") {
       setActiveProfileTab(options.tab || "AI Insights");
     }
+    setNotificationsOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setView(nextView);
   }
 
   function showToast(message) {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToast(message);
-    window.setTimeout(() => setToast(""), 3200);
+    setLiveMessage(message);
+    toastTimerRef.current = window.setTimeout(() => setToast(""), 4200);
   }
 
   function generatePresentation() {
@@ -493,6 +691,7 @@ function App() {
     setNotesError("");
     setProcessing(true);
     setProgress(0);
+    setLiveMessage("Analyzing meeting notes, 0 percent complete.");
     const startedAt = Date.now();
     const timer = window.setInterval(() => {
       const elapsed = Date.now() - startedAt;
@@ -504,9 +703,11 @@ function App() {
         if (isSterlingScenarioInput(trimmedNotes, audioSelected)) {
           setActions(initialActions);
           setExtractionMode("scripted");
+          setLiveMessage("AI extracted three Sterling Family actions for advisor review.");
         } else {
           setActions([]);
           setExtractionMode("needs_review");
+          setLiveMessage("No confident actions were extracted. Human review is needed.");
         }
         navigate("actions");
       }
@@ -514,6 +715,8 @@ function App() {
   }
 
   function approveAction(id) {
+    const targetAction = actions.find((action) => action.id === id);
+    setLiveMessage(`Approving ${targetAction?.title || "action"}.`);
     setActions((current) =>
       current.map((action) =>
         action.id === id ? { ...action, status: "approving" } : action
@@ -524,6 +727,7 @@ function App() {
         const nextActions = current.map((action) =>
           action.id === id ? { ...action, status: "complete", reviewNote: "" } : action
         );
+        setLiveMessage(`${targetAction?.title || "Action"} approved and logged.`);
         if (nextActions.every((action) => action.status === "complete")) {
           window.setTimeout(() => navigate("confirmation"), 450);
         }
@@ -533,9 +737,13 @@ function App() {
   }
 
   function approveAll() {
+    const count = batchApprovableActions.length;
+    setLiveMessage(
+      `Approving ${count} ${count === 1 ? "action" : "actions"}. Email Draft requires explicit send and will not be auto-sent.`
+    );
     setActions((current) => {
       const nextActions = current.map((action) =>
-        ["pending", "draft"].includes(action.status)
+        action.id !== "email" && ["pending", "draft"].includes(action.status)
           ? { ...action, status: "complete", reviewNote: "" }
           : action
       );
@@ -571,6 +779,11 @@ function App() {
       )
     );
     setReviewModal(null);
+    setLiveMessage(
+      status === "rejected"
+        ? `Action rejected with reason: ${reasonType}.`
+        : `Changes requested with reason: ${reasonType}.`
+    );
     showToast(status === "rejected" ? "Action rejected and logged." : "Changes requested and logged.");
   }
 
@@ -603,6 +816,8 @@ function App() {
     setEmailDraft(defaultEmailDraft);
     setEmailEnvelope(defaultEmailEnvelope);
     setEmailModalOpen(false);
+    setEmailSendConfirmOpen(false);
+    setApproveAllConfirmOpen(false);
     setReviewModal(null);
     setSourcePanel(null);
     setDeckModalOpen(false);
@@ -621,6 +836,9 @@ function App() {
         <div className="sr-only" aria-live="polite" aria-atomic="true">
           {processing ? `Analyzing meeting notes, ${progress} percent complete` : toast}
         </div>
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {liveMessage}
+        </div>
         <Topbar
           view={view}
           pendingCount={pendingCount}
@@ -635,6 +853,7 @@ function App() {
             onSourceOpen={setSourcePanel}
             recentActivity={recentActivity}
             showToast={showToast}
+            debugMode={debugMode}
           />
         )}
         {view === "meeting" && (
@@ -673,7 +892,7 @@ function App() {
           <ActionCenter
             actions={actions}
             approveAction={approveAction}
-            approveAll={approveAll}
+            requestApproveAll={() => setApproveAllConfirmOpen(true)}
             saveDraftAction={saveDraftAction}
             openReviewModal={setReviewModal}
             riskTolerance={riskTolerance}
@@ -686,10 +905,13 @@ function App() {
             setEmailEnvelope={setEmailEnvelope}
             emailModalOpen={emailModalOpen}
             setEmailModalOpen={setEmailModalOpen}
+            emailSendConfirmOpen={emailSendConfirmOpen}
+            setEmailSendConfirmOpen={setEmailSendConfirmOpen}
             completedCount={completedCount}
             rejectedCount={rejectedCount}
             changesCount={changesCount}
             pendingCount={pendingCount}
+            batchApprovableActions={batchApprovableActions}
             extractionMode={extractionMode}
             onSourceOpen={setSourcePanel}
           />
@@ -731,15 +953,36 @@ function App() {
       {resetConfirmOpen && (
         <ResetConfirmModal
           approvedCount={completedCount}
+          rejectedCount={rejectedCount}
+          changesCount={changesCount}
+          draftCount={draftCount}
           actionCount={actions.length}
+          hasNotes={Boolean(notes.trim())}
+          presentationReady={presentationReady}
           onCancel={() => setResetConfirmOpen(false)}
           onConfirm={resetDemo}
+        />
+      )}
+      {approveAllConfirmOpen && (
+        <ApproveAllConfirmModal
+          actions={batchApprovableActions}
+          emailPending={actions.some(
+            (action) => action.id === "email" && ["pending", "draft"].includes(action.status)
+          )}
+          onCancel={() => setApproveAllConfirmOpen(false)}
+          onConfirm={() => {
+            setApproveAllConfirmOpen(false);
+            approveAll();
+          }}
         />
       )}
       {toast && (
         <div className="toast" role="status">
           <CheckCircle2 size={18} />
           <span>{toast}</span>
+          <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setToast("")}>
+            <X size={15} />
+          </button>
         </div>
       )}
     </div>
@@ -827,10 +1070,12 @@ function Topbar({
       </div>
       <div className="topbar-actions">
         <button
-          className="icon-button"
+          className="icon-button notification-trigger"
           type="button"
           title="Notifications"
           onClick={() => setNotificationsOpen((open) => !open)}
+          aria-expanded={notificationsOpen}
+          aria-label="Open notifications"
         >
           <Bell size={18} />
         </button>
@@ -838,22 +1083,31 @@ function Topbar({
           <div className="notifications-panel">
             <div className="notifications-header">
               <strong>Notifications</strong>
-              <span>{pendingCount} approvals pending</span>
+              <span>{pendingCount} pending</span>
             </div>
-            <button className="notification-item" type="button" onClick={() => navigate("actions")}>
-              <ClipboardCheck size={16} />
-              <span>Review AI action queue</span>
-            </button>
-            <button className="notification-item" type="button" onClick={() => navigate("profile")}>
-              <AlertTriangle size={16} />
-              <span>Sterling allocation drift needs review</span>
-            </button>
+            <div className="notification-section">
+              <span className="notification-section-title">Needs review</span>
+              <button className="notification-item" type="button" onClick={() => navigate("actions")}>
+                <ClipboardCheck size={16} />
+                <span>Review AI action queue</span>
+                <small>Action</small>
+              </button>
+              <button className="notification-item" type="button" onClick={() => navigate("profile")}>
+                <AlertTriangle size={16} />
+                <span>Sterling allocation drift needs review</span>
+                <small>Alert</small>
+              </button>
+            </div>
+            <div className="notification-section">
+              <span className="notification-section-title">Activity</span>
             {recentActivity.slice(0, 3).map((item) => (
               <div className="notification-item passive" key={item}>
                 <History size={16} />
                 <span>{item}</span>
+                <small>Logged</small>
               </div>
             ))}
+            </div>
           </div>
         )}
         <button
@@ -863,7 +1117,7 @@ function Topbar({
           onClick={() => navigate("actions")}
         >
           <ClipboardCheck size={16} />
-          {pendingCount} approvals
+          {pendingCount} pending
         </button>
         <button className="primary-button compact" type="button" onClick={() => navigate("notes")}>
           <Mic2 size={16} />
@@ -874,7 +1128,7 @@ function Topbar({
   );
 }
 
-function Dashboard({ navigate, onSourceOpen, recentActivity, showToast }) {
+function Dashboard({ navigate, onSourceOpen, recentActivity, showToast, debugMode }) {
   return (
     <div className="page-grid dashboard-grid">
       <section className="summary-band">
@@ -1158,14 +1412,16 @@ function Dashboard({ navigate, onSourceOpen, recentActivity, showToast }) {
         </div>
       </section>
 
-      <section className="surface">
-        <SectionHeader icon={Info} title="Prototype State Specs" />
-        <div className="state-spec-list">
-          <StateSpec label="No meetings today" text="Dashboard shows an empty schedule with an add/import calendar prompt." />
-          <StateSpec label="Brief still preparing" text="Meeting rows show percent synced, ETA, and a retry control if a source fails." />
-          <StateSpec label="Source error" text="Evidence chips show the failed system and route to the source record panel." />
-        </div>
-      </section>
+      {debugMode && (
+        <section className="surface">
+          <SectionHeader icon={Info} title="Prototype State Specs" />
+          <div className="state-spec-list">
+            <StateSpec label="No meetings today" text="Dashboard shows an empty schedule with an add/import calendar prompt." />
+            <StateSpec label="Brief still preparing" text="Meeting rows show percent synced, ETA, and a retry control if a source fails." />
+            <StateSpec label="Source error" text="Evidence chips show the failed system and route to the source record panel." />
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -1569,7 +1825,7 @@ function NotesInput({
 function ActionCenter({
   actions,
   approveAction,
-  approveAll,
+  requestApproveAll,
   saveDraftAction,
   openReviewModal,
   riskTolerance,
@@ -1582,15 +1838,21 @@ function ActionCenter({
   setEmailEnvelope,
   emailModalOpen,
   setEmailModalOpen,
+  emailSendConfirmOpen,
+  setEmailSendConfirmOpen,
   completedCount,
   rejectedCount,
   changesCount,
   pendingCount,
+  batchApprovableActions,
   extractionMode,
   onSourceOpen
 }) {
   const hasActions = actions.length > 0;
-  const canApproveAll = actions.some((action) => ["pending", "draft"].includes(action.status));
+  const canApproveAll = batchApprovableActions.length > 0;
+  const emailAction = actions.find((action) => action.id === "email");
+  const emailSendAllowed = ["pending", "draft"].includes(emailAction?.status);
+  const allDecided = hasActions && pendingCount === 0;
 
   return (
     <div className="page-grid actions-grid">
@@ -1613,7 +1875,7 @@ function ActionCenter({
             {completedCount} / {actions.length || 3} approved · {rejectedCount} rejected ·{" "}
             {changesCount} changes
           </span>
-          <button className="primary-button" type="button" onClick={approveAll} disabled={!canApproveAll}>
+          <button className="primary-button" type="button" onClick={requestApproveAll} disabled={!canApproveAll}>
             <Check size={16} />
             Approve All
           </button>
@@ -1625,6 +1887,14 @@ function ActionCenter({
           <div className="demo-mode-banner">
             <Sparkles size={16} />
             <span>Demo mode: scripted output has been generated from the Sterling sample notes.</span>
+          </div>
+        )}
+        {allDecided && (
+          <div className="all-clear-banner">
+            <CheckCircle2 size={18} />
+            <span>
+              All clear: no pending AI actions remain. The audit summary stays visible for review.
+            </span>
           </div>
         )}
         {!hasActions && (
@@ -1739,6 +2009,9 @@ function ActionCenter({
             value="Routes to CSA queue"
             hint="CSA means Client Service Associate. This mock queue is where Daniel Reed receives operational tasks."
           />
+          <button className="text-button policy-link" type="button" onClick={() => onSourceOpen("Open tasks")}>
+            Open mock CSA queue <ArrowRight size={15} />
+          </button>
         </section>
         <section className="surface">
           <SectionHeader icon={Info} title="Evidence Quality" />
@@ -1772,7 +2045,10 @@ function ActionCenter({
                 className="icon-button"
                 type="button"
                 aria-label="Close email draft"
-                onClick={() => setEmailModalOpen(false)}
+                onClick={() => {
+                  setEmailSendConfirmOpen(false);
+                  setEmailModalOpen(false);
+                }}
                 autoFocus
               >
                 <X size={18} />
@@ -1789,23 +2065,41 @@ function ActionCenter({
               <pre>{emailEnvelope.signature}</pre>
             </div>
             <div className="modal-footer">
-              <button className="secondary-button" type="button" onClick={() => setEmailModalOpen(false)}>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setEmailSendConfirmOpen(false);
+                  setEmailModalOpen(false);
+                }}
+              >
                 Keep Draft
               </button>
               <button
                 className="primary-button"
                 type="button"
+                disabled={!emailSendAllowed}
                 onClick={() => {
-                  setEmailModalOpen(false);
-                  approveAction("email");
+                  setEmailSendConfirmOpen(true);
                 }}
               >
                 <Send size={16} />
-                Send Email
+                {emailSendAllowed ? "Send Email" : "Send locked"}
               </button>
             </div>
           </div>
         </div>
+      )}
+      {emailSendConfirmOpen && (
+        <EmailSendConfirmModal
+          envelope={emailEnvelope}
+          onCancel={() => setEmailSendConfirmOpen(false)}
+          onConfirm={() => {
+            setEmailSendConfirmOpen(false);
+            setEmailModalOpen(false);
+            approveAction("email");
+          }}
+        />
       )}
     </div>
   );
@@ -1826,6 +2120,15 @@ function ActionCard({
   const changes = action.status === "changes";
   const draft = action.status === "draft";
   const locked = complete || approving || rejected || changes;
+  const approveLabel = complete
+    ? "Approved"
+    : rejected
+      ? "Rejected"
+      : changes
+        ? "Changes requested"
+        : approving
+          ? "Approving..."
+          : "Approve";
 
   return (
     <article
@@ -1842,10 +2145,12 @@ function ActionCard({
           <p>{action.summary}</p>
         </div>
         <span className="action-status-stack">
-          <span className="confidence" title={action.confidenceRationale}>
-            <Info size={13} />
-            AI Confidence: {action.confidence}%
-          </span>
+          <TooltipTrigger content={action.confidenceRationale}>
+            <span className="confidence">
+              <Info size={13} />
+              AI Confidence: {action.confidence}%
+            </span>
+          </TooltipTrigger>
           {complete && <StatusBadge tone="ready">Approved</StatusBadge>}
           {draft && <StatusBadge tone="neutral">Draft saved</StatusBadge>}
           {rejected && <StatusBadge tone="rejected">Rejected</StatusBadge>}
@@ -1899,7 +2204,7 @@ function ActionCard({
             onClick={() => approveAction(action.id)}
           >
             {complete ? <CheckCircle2 size={16} /> : <Check size={16} />}
-            {complete ? "Approved" : approving ? "Approving..." : "Approve"}
+            {approveLabel}
           </button>
         </div>
       </div>
@@ -2107,13 +2412,85 @@ function DeckPreviewModal({ onClose, onToast }) {
   );
 }
 
+function ApproveAllConfirmModal({ actions, emailPending, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Confirm bulk approval">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Approval confirmation</p>
+            <h3>Approve {actions.length} selected {actions.length === 1 ? "action" : "actions"}?</h3>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close bulk approval confirmation" onClick={onCancel} autoFocus>
+            <X size={18} />
+          </button>
+        </div>
+        <p className="modal-help">
+          This records approval for the non-email actions listed below. Email sending requires an
+          explicit Send Email confirmation and will not be auto-sent.
+        </p>
+        <div className="confirm-list">
+          {actions.map((action) => (
+            <div className="confirm-row" key={action.id}>
+              <CheckCircle2 size={16} />
+              <span>{action.title}</span>
+            </div>
+          ))}
+          {emailPending && (
+            <div className="confirm-row muted">
+              <Mail size={16} />
+              <span>Email Draft requires explicit Send and stays pending.</span>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="primary-button" type="button" onClick={onConfirm}>
+            <Check size={16} />
+            Confirm Approval
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailSendConfirmModal({ envelope, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
+      <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Confirm email send">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Explicit send required</p>
+            <h3>Send follow-up email?</h3>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close email send confirmation" onClick={onCancel} autoFocus>
+            <X size={18} />
+          </button>
+        </div>
+        <p className="modal-help">
+          Review the envelope one more time. This validation action logs the send decision to the
+          audit trail.
+        </p>
+        <EmailEnvelopePreview envelope={envelope} />
+        <div className="modal-footer">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="primary-button" type="button" onClick={onConfirm}>
+            <Send size={16} />
+            Confirm Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SourceRecordPanel({ source, onClose }) {
-  const record = sourceRecords[source] || {
-    system: "Meeting evidence",
-    record: source,
-    updated: "Extracted from meeting notes",
-    details: ["This evidence line is tied to the advisor-provided notes in the current session."]
-  };
+  const record = buildSourceRecord(source);
 
   return (
     <aside className="source-panel" aria-label="Source record panel">
@@ -2139,6 +2516,22 @@ function SourceRecordPanel({ source, onClose }) {
         <strong>{record.updated}</strong>
       </div>
       <div className="source-record-card">
+        <span>Owner</span>
+        <strong>{record.owner}</strong>
+      </div>
+      <div className="source-record-card">
+        <span>Source timestamp</span>
+        <strong>{record.timestamp}</strong>
+      </div>
+      <div className="source-record-card">
+        <span>Original excerpt</span>
+        <p>{renderHighlightedExcerpt(record.excerpt, record.highlight)}</p>
+      </div>
+      <div className="source-record-card">
+        <span>System of record link</span>
+        <code>{record.link}</code>
+      </div>
+      <div className="source-record-card">
         <span>Fields</span>
         <ul>
           {record.details.map((detail) => (
@@ -2146,11 +2539,29 @@ function SourceRecordPanel({ source, onClose }) {
           ))}
         </ul>
       </div>
+      <div className="source-record-card">
+        <span>Production schema</span>
+        <ul>
+          {record.schema.map((field) => (
+            <li key={field}>{field}</li>
+          ))}
+        </ul>
+      </div>
     </aside>
   );
 }
 
-function ResetConfirmModal({ approvedCount, actionCount, onCancel, onConfirm }) {
+function ResetConfirmModal({
+  approvedCount,
+  rejectedCount,
+  changesCount,
+  draftCount,
+  actionCount,
+  hasNotes,
+  presentationReady,
+  onCancel,
+  onConfirm
+}) {
   return (
     <div className="modal-backdrop" role="presentation" onKeyDown={trapModalFocus}>
       <div className="modal review-modal" role="dialog" aria-modal="true" aria-label="Confirm reset">
@@ -2163,10 +2574,17 @@ function ResetConfirmModal({ approvedCount, actionCount, onCancel, onConfirm }) 
             <X size={18} />
           </button>
         </div>
-        <p className="modal-help">
-          This will discard {approvedCount} / {actionCount || 3} approvals, rejected actions, draft
-          edits, presentation state, and meeting notes from this browser session.
-        </p>
+        <div className="reset-impact">
+          <p>
+            This will discard the current validation session, including:
+          </p>
+          <ul>
+            <li><strong>{approvedCount}</strong> approved of <strong>{actionCount || 3}</strong> proposed actions</li>
+            <li><strong>{rejectedCount}</strong> rejected actions and <strong>{changesCount}</strong> change requests</li>
+            <li><strong>{draftCount}</strong> saved draft edits</li>
+            <li><strong>{hasNotes ? "1" : "0"}</strong> notes workspace input and <strong>{presentationReady ? "1" : "0"}</strong> generated presentation package</li>
+          </ul>
+        </div>
         <div className="modal-footer">
           <button className="secondary-button" type="button" onClick={onCancel}>
             Cancel
@@ -2438,6 +2856,10 @@ function PreviewBlock({ tone, label, title, text, source }) {
 function AllocationComparison({ compact = false }) {
   return (
     <div className={`allocation-bars ${compact ? "compact" : ""}`}>
+      <div className="bar-legend" aria-label="Current versus target allocation legend">
+        <span><i className="current" /> Current allocation bar</span>
+        <span><i className="target" /> Target marker</span>
+      </div>
       {allocationData.map((item) => (
         <div className="allocation-bar-row" key={item.name}>
           <div className="allocation-bar-label">
@@ -2475,18 +2897,39 @@ function TrustCallout({ tone, title, text, action }) {
   );
 }
 
+function TooltipTrigger({ content, children, className = "", containsFocusable = false }) {
+  if (!content) return children;
+
+  return (
+    <span
+      className={`tooltip-trigger ${className}`}
+      tabIndex={containsFocusable ? undefined : 0}
+    >
+      {children}
+      <span className="tooltip-bubble" role="tooltip">
+        {content}
+      </span>
+    </span>
+  );
+}
+
 function EvidenceStrip({ sources, onSourceOpen }) {
   return (
     <div className="evidence-strip">
       {sources.map((source) => (
-        <button
+        <TooltipTrigger
           key={source}
-          type="button"
-          title={`Open source record: ${source}`}
-          onClick={() => onSourceOpen?.(source)}
+          content={`Open source record: ${source}`}
+          containsFocusable
         >
-          {source}
-        </button>
+          <button
+            type="button"
+            aria-label={`Open source record: ${source}`}
+            onClick={() => onSourceOpen?.(source)}
+          >
+            {source}
+          </button>
+        </TooltipTrigger>
       ))}
     </div>
   );
@@ -2494,10 +2937,16 @@ function EvidenceStrip({ sources, onSourceOpen }) {
 
 function TrustLine({ icon: Icon, label, value, hint }) {
   return (
-    <div className="trust-line" title={hint || undefined}>
+    <div className="trust-line">
       <Icon size={17} />
       <span>{label}</span>
-      <strong className={hint ? "has-hint" : ""}>{value}</strong>
+      {hint ? (
+        <TooltipTrigger content={hint} className="trust-value-wrap">
+          <strong className="has-hint">{value}</strong>
+        </TooltipTrigger>
+      ) : (
+        <strong>{value}</strong>
+      )}
     </div>
   );
 }
